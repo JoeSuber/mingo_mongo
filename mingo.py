@@ -130,26 +130,30 @@ if __name__ == "__main__":
     # make report to get what we don't have
 
     # first fix formats and types to conform
+    ctr = 0
     for item in addlist:
+        FOUND = False
         try:
             item[u'cost'] = int(item[u'cost'].replace('$', "").replace('.', "").strip('E') or 0)
             item[u'price'] = int(item[u'price'].replace('$', "").replace('.', "").strip('E') or 0)
             item[u'product_code'] = ('GAW ' + item[u'product_code']).strip()
-            item[u'sku'] = int(item[u'sku'])
+            #item[u'sku'] = int(item[u'sku'])
         except ValueError as Ve:
+            print('*(*(*(*(*)*)*)*)')
             pprint(item)
             pprint(Ve)
-
-    pprint(addlist)
-    print('***********')
-    for item in addlist:
-        result = stuffdb.find(item[u'sku'])
-        if result:
-            pprint(result)
-            # add
-        else:
-            with open('/home/suber1/Desktop/order.txt', 'wU') as ofob:
-                ofob.write(str(result))
+        for olditem in stuffdb.find():
+            if item[u'sku'] in olditem.viewvalues():
+                print('BAR FOUND: {:8} {}'.format(item[u'product_code'], item[u'name']))
+                FOUND = True
+                break
+            elif item[u'product_code'] in olditem.viewvalues():
+                print('PCD FOUND: {:8} {}'.format(item[u'product_code'], item[u'name']))
+                FOUND = True
+                break
+        if not FOUND:
+            with open('/home/suber1/Desktop/order.txt', 'ab') as ofob:
+                ofob.write("{} - item: {:11} {:7} {} \n".format(ctr, item[u'sku'], item[u'price'], item[u'name']))
 
     print("there are {} items to be added / updated".format(len(addlist)))
     # assign/map parsed out headers to current database categories
