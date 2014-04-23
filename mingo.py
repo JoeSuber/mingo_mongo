@@ -131,8 +131,8 @@ if __name__ == "__main__":
 
     # first fix formats and types to conform
     for item in addlist:
-        item[u'cost'] = int(item[u'cost'].replace('$', "").replace('.', "") or 0)
-        item[u'price'] = int(item[u'price'].replace('$', "").replace('.', "") or 0)
+        item[u'cost'] = int(item[u'cost'].replace('$', "").replace('.', "").strip('E') or 0)
+        item[u'price'] = int(item[u'price'].replace('$', "").replace('.', "").strip('E') or 0)
         item[u'product_code'] = ('GAW ' + item[u'product_code']).strip()
         item[u'sku'] = int(item[u'sku'])
 
