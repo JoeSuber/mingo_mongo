@@ -5,6 +5,7 @@ from collections import OrderedDict, Counter
 import os
 import glob
 from pprint import pprint
+import cPickle
 
 def selections(dd=None, prompt='Choose from above'):
     """
@@ -65,23 +66,78 @@ def importCSV(fn, headers):
 def headcheck(hdrlist, prev_mapped):
     return None
 
-GAWmap = {'SHORT CODE': u'product_code', 'BARCODE': u'sku', 'US Trade': u'cost', 'US MSRP': u'price',
-          'long_description': u'name', 'Reorder': u'description'}
+class CsvMapped(dict):
+    """
+    Enable persistent pairing of parsed CSV-parts to Mongodb collection dicts.
+    Some mappings are defined here and also load, if available,
+    pickled mappings created during runtime by user in interactive
+    matching process.
+    """
+    def __init__(self, atlas={}, mapfile='passed_in_csv_headers.pkl'):
+        """
+        :type atlas: dict
+        """
+        try:
+            assert(isinstance(atlas, dict))
+        except AssertionError:
+            print("A non-dict was passed to CsvMapped via atlas: ")
+            pprint(atlas)
+            exit(0)
+        if len(atlas):
+            for elem in atlas.viewvalues():
+                try:
+                    assert(isinstance(elem, dict))
+                except AssertionError:
+                    print("A value of an Atlas-key is not a dict: ")
+                    pprint(elem)
+                    exit(0)
+            with open(mapfile, 'wB') as mapfob:
+                cPickle.dump(atlas, mapfob, cPickle.HIGHEST_PROTOCOL)
+        else:
+            with open(mapfile, 'rB') as mapfob:
+                atlas = cPickle.load(mapfob)
+
+        atlas.update(dict(
+            GAWmap={'SHORT CODE': u'product_code', 'BARCODE': u'sku', 'US Trade': u'cost',
+                    'US MSRP': u'price', 'long_description': u'name', 'Reorder': u'description'},
+
+            GAWinvoice={'Trade': u'cost', 'MSRP': u'price', 'Description': u'name',
+                        'CODE': u'product_code', 'Qty': u''},
+
+            SouthHobbyInv={'SKU': u'product_code', 'desc': u'name'}
+        ))
+        self.atlas = atlas
+
+    def headers_to_mongo(self, db):
+        """
+        get the db and store the maps created by user so as to not rely on pickled
+        """
+        db.update(
+                     { type: "book", item : "journal" },
+                     { $set : { qty: 10 } },
+                     { upsert : true }
+                   )
+        for kk, vv in self.atlas.viewitems():
+            csvmapsdb.
+
+
 
 if __name__ == "__main__":
     looking_for = '*.csv'
     csv_dir = 'Documents'
+    dbserverip = '192.168.0.105'
+    dbserverip = 'localhost'
+    dbserverport = 27017
 
     # user chooses the database and collection we are messing with:
-    overalldb, stuffdb = explore(0, MongoClient('localhost', 27017))
-
+    overalldb, stuffdb = explore(0, MongoClient(dbserverip, dbserverport))
     # previously found mappings between CSV and DB columns:
     hdrs = overalldb['headers_map']
 
     # paths to CSV files, have user choose one:
     user = os.path.join(os.path.expanduser('~'), csv_dir)
     fn_dd = {ctr: fn for ctr, fn in enumerate(glob.glob(user + os.sep + looking_for))}
-    _, fpath = selections(fn_dd, prompt='Above are CSV files you can add to mongod. Choose wisely: ')
+    _, fpath = selections(fn_dd, prompt='Above are saved CSV files you can add to mongod. Choose wisely: ')
     print('opening: {}'.format(fpath))
     with open(fpath, 'rU') as fob:
         thetext = fob.read().splitlines()
@@ -117,6 +173,9 @@ if __name__ == "__main__":
 
     # check if a mapping already has been made fitting some CSV-derived columns
     # (skipping above)
+
+    # user chooses the kind of invoice being imported
+
     # assign correct info to correct keys for insertion into current db collection
     addlist = []
     for itemdd in csvdocs.viewvalues():
