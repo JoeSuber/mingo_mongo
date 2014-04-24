@@ -110,7 +110,7 @@ class CsvMapped(dict):
 
     def headers_to_mongo(self, db):
         """
-        get the db and store the maps created by user so as to not rely on pickled
+        get the db and store the unique maps created by user so as to not rely on pickled
         """
         db.update(
                      { type: "book", item : "journal" },
@@ -125,7 +125,7 @@ class CsvMapped(dict):
 if __name__ == "__main__":
     looking_for = '*.csv'
     csv_dir = 'Documents'
-    dbserverip = '192.168.0.105'
+    #dbserverip = '192.168.0.105'
     dbserverip = 'localhost'
     dbserverport = 27017
 
@@ -133,11 +133,38 @@ if __name__ == "__main__":
     overalldb, stuffdb = explore(0, MongoClient(dbserverip, dbserverport))
     # previously found mappings between CSV and DB columns:
     hdrs = overalldb['headers_map']
+    importedfn = overalldb['imported_flnms']
 
-    # paths to CSV files, have user choose one:
+    # paths to CSV files,
     user = os.path.join(os.path.expanduser('~'), csv_dir)
     fn_dd = {ctr: fn for ctr, fn in enumerate(glob.glob(user + os.sep + looking_for))}
-    _, fpath = selections(fn_dd, prompt='Above are saved CSV files you can add to mongod. Choose wisely: ')
+
+    # create unique key for file to prevent re-import of the same data
+    longfnkey = {}
+    for num, fnv in fn_dd.viewitems():
+        longfnkey.update({str(fnv + [p for p in dir(os.stat(fnv)) if 'st' in p]): num})
+
+    # check database against filenames
+    alreadyused = []
+    examining = longfnkey.keys()
+    for checking in importedfn.find():
+        if checking in examining:
+            fn_dd[longfnkey[checking]]
+
+    fn_dd.update({len(fn_dd): ' - NONE - '})
+
+    # now have user choose one:
+    YOUMAYPASS = False
+    while not YOUMAYPASS:
+        selnum, fpath = selections(fn_dd, prompt='Above are saved CSV files you can add to mongod. Choose wisely: ')
+        if selnum in alreadyused:
+            YOUMAYPASS = False
+            print("that one has already been imported. Try again")
+        else:
+            YOUMAYPASS = True
+            print(" You chose wisely: {}".format(fpath))
+
+    
     print('opening: {}'.format(fpath))
     with open(fpath, 'rU') as fob:
         thetext = fob.read().splitlines()
