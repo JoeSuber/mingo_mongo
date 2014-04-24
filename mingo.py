@@ -128,6 +128,7 @@ if __name__ == "__main__":
     #dbserverip = '192.168.0.105'
     dbserverip = 'localhost'
     dbserverport = 27017
+    xmarks = CsvMapped()
 
     # user chooses the database and collection we are messing with:
     overalldb, stuffdb = explore(0, MongoClient(dbserverip, dbserverport))
@@ -149,8 +150,9 @@ if __name__ == "__main__":
     examining = longfnkey.keys()
     for checking in importedfn.find():
         if checking in examining:
-            fn_dd[longfnkey[checking]]
+            alreadyused.append(fn_dd[longfnkey[checking]])
 
+    print('list of those already used: {}'.format(alreadyused))
     fn_dd.update({len(fn_dd): ' - NONE - '})
 
     # now have user choose one:
@@ -164,7 +166,7 @@ if __name__ == "__main__":
             YOUMAYPASS = True
             print(" You chose wisely: {}".format(fpath))
 
-    
+
     print('opening: {}'.format(fpath))
     with open(fpath, 'rU') as fob:
         thetext = fob.read().splitlines()
@@ -208,7 +210,7 @@ if __name__ == "__main__":
     for itemdd in csvdocs.viewvalues():
         csvstuff = {}
         # GWk come from manufacturer's csv-headers, dbv are in mongo database
-        for GWk, dbv in GAWmap.viewitems():
+        for GWk, dbv in xmarks.atlas['GAWmap'].viewitems():
             if GWk in itemdd:
                 csvstuff[dbv] = itemdd[GWk]
         addlist.append(csvstuff)
@@ -220,12 +222,12 @@ if __name__ == "__main__":
     for item in addlist:
         FOUND = False
         try:
-            item[u'cost'] = int(item[u'cost'].replace('$', "").replace('.', "").strip('E') or 0)
-            item[u'price'] = int(item[u'price'].replace('$', "").replace('.', "").strip('E') or 0)
+            item[u'cost'] = int(item[u'cost'].replace('$', "").replace('.', "") or 0)
+            item[u'price'] = int(item[u'price'].replace('$', "").replace('.', "") or 0)
             item[u'product_code'] = ('GAW ' + item[u'product_code']).strip()
             #item[u'sku'] = int(item[u'sku'])
         except ValueError as Ve:
-            print('*(*(*(*(*)*)*)*)')
+            print('*(* VALUE (*(*(*)*) ERRoR *)*)')
             pprint(item)
             pprint(Ve)
         for olditem in stuffdb.find():
