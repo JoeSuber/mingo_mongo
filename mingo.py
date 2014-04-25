@@ -60,15 +60,6 @@ def explore(done, client):
     print(' @!@!@! Active mongo parts: {}.{} '.format(usedb_name, collection_name))
     return primarydb, thestuffdb
 
-def importCSV(fn, headers):
-    """
-    given CSV filename and list of headers, return list of dict, where the
-    list-element-dicts are ready to enter the mongo database with keys = CSV-headers
-    """
-    return None
-
-def headcheck(hdrlist, prev_mapped):
-    return None
 
 class CsvMapped(dict):
     """
@@ -163,20 +154,61 @@ class CsvMapped(dict):
         """
         with open(fpath, 'rU') as fob:
             self.thetext = fob.read().splitlines()
-
         return "!|!".join([h.strip() for h in self.thetext[online].split(spliton)])
 
-    def headers_to_mongo(self, db):
+    def headers_to_mongo(self, db, hstrip):
         """
-        get the db and store the unique maps created by user so as to not rely on pickled
+        Here are the database inventory categories. Also interactively generates the
+        map to be saved and referenced by the header-string.
         """
-        db.update(
-                     { type: "book", item : "journal" },
-                     { $set : { qty: 10 } },
-                     { upsert : true }
-                   )
-        for kk, vv in self.atlas.viewitems():
-            csvmapsdb.
+        if hstrip in self.atlas.viewkeys():
+            print("Already assigned: {} ".format(hstrip))
+            return self.atlas[hstrip]
+        catlist = [u'date_added', u'desc_long', u'price_we_sell', u'product_code',
+                   u'manufacturer', u'sale_history', u'buy_history', u'barcode', u'we_buy_price',
+                   u'desc_short', u'date_modified', u'_id', u'quant_in_stock', u'quant_min',
+                   u'quant_max', u'quant_on_order', u'sku', u'order_history', u'receive_hist',
+                   u'increment_quant', u'decrement_quant']
+        hdrlist = {kk: vv for kk, vv in enumerate(hstrip.split('!|!'))}
+        hdrlist.update({len(hdrlist): ' - NO MATCH - ', len(hdrlist)+1: ' - START OVER - '})
+        pprint(catlist)
+        genmap = {}
+        for dbcat in catlist:
+            print()
+            selnum, selcategory = selections(hdrlist, prompt='proper match for {}'.format(dbcat))
+            if selcategory != ' - NO MATCH - ':
+                if selcategory == ' - START OVER - ':
+                    return self.headers_to_mongo(db, hstrip)
+                genmap[selcategory] = dbcat
+                hdrlist.pop(selcategory)
+                if len(hdrlist) < 2:
+                    break
+        self.atlas[hstrip] = genmap
+        with open(self.pickle_fn, 'wB') as hfob:
+            cPickle.dump(self.atlas, hfob, cPickle.HIGHEST_PROTOCOL)
+        return genmap
+
+    def parsedata(self, headers, top_skip=0):
+        """
+        the previously read file, a list of lines, is split out by comma, assigned to dict
+        """
+        header_quant = len(headers)
+        numer = 0
+        csvdocs = {}
+        for numer, csvline in enumerate(self.thetext):
+            if numer > top_skip:       # skipping line zero as it should only be the headers
+                lineparts = csvline.split(',')
+                try:
+                    assert(header_quant == len(lineparts))
+                except AssertionError:
+                    print('Whoa! at line {} in {} '.format(numer, fpath))
+                    print('(looks like) {}'.format(csvline))
+                    print(' there are {} header-keys but {} values'.format(header_quant, len(lineparts)))
+                    print(' exiting now so you may fix the CSV file.')
+                    exit(0)
+                csvdocs[numer] = {h: cell.strip() for h, cell in zip(headers, lineparts)}
+        print('{} items are to be gleaned from this CSV file: {}'.format(numer, fpath))
+
 
 
 
@@ -212,20 +244,23 @@ if __name__ == "__main__":
             # open file, determine header
             #  side effect: text body inside CsvMapped instance
             hdrstring, np = '', 0
-            while not hdrs:
+            while not hdrstring:
                 hdrstring = xmarks.construct_header(fpath, online=np)
                 np += 1
                 if np > 60:
                     print("Breaking out due to a lot of blank lines instead of headers")
                     break
             print("Headline: #{:3} {}".format(np, hdrstring))
-            # look up header in database to find import map
+                # look up header in database to find import map
             importmap = hdrs[hdrstring].find_one()
-            # if no import-map, create the import-map
+            # if no import-map, create the import-map:
             if not importmap:
-
+                importmap = xmarks.headers_to_mongo(hdrs, hdrstring)
+                if importmap:
+                    hdrs[hdrstring].insert(importmap)
                 #including some rules about adding, subtracting quantities
             # using the import-map, import the data
+            xmarks.parsedata(importmap, top_skip=np)
             # on success, add the input filename to database of imported_fn, re-run csv-sources
 
     # parse csv-file contents into dict of dict-keyed-by-csv-headers:
