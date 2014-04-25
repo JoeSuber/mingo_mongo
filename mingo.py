@@ -194,9 +194,9 @@ class CsvMapped(dict):
         """
         header_quant = len(headers)
         numer = 0
-        csvdocs = {}
+        csvdocs = []
         for numer, csvline in enumerate(self.thetext):
-            if numer > top_skip:       # skipping line zero as it should only be the headers
+            if numer >= top_skip:       # skipping line zero as it should only be the headers
                 lineparts = csvline.split(',')
                 try:
                     assert(header_quant == len(lineparts))
@@ -206,9 +206,9 @@ class CsvMapped(dict):
                     print(' there are {} header-keys but {} values'.format(header_quant, len(lineparts)))
                     print(' exiting now so you may fix the CSV file.')
                     exit(0)
-                csvdocs[numer] = {h: cell.strip() for h, cell in zip(headers, lineparts)}
+                csvdocs.append({h: cell.strip() for h, cell in zip(headers.values(), lineparts)})
         print('{} items are to be gleaned from this CSV file: {}'.format(numer, fpath))
-
+        return csvdocs
 
 
 
@@ -260,40 +260,23 @@ if __name__ == "__main__":
                     hdrs[hdrstring].insert(importmap)
                 #including some rules about adding, subtracting quantities
             # using the import-map, import the data
-            xmarks.parsedata(importmap, top_skip=np)
+            csvdocs = xmarks.parsedata(importmap, top_skip=np)
             # on success, add the input filename to database of imported_fn, re-run csv-sources
-
-    # parse csv-file contents into dict of dict-keyed-by-csv-headers:
-    numer = 0
-    top_skip = 0
-    csvdocs = {}
-    for numer, csvline in enumerate(thetext):
-        if numer > top_skip:       # skipping line zero as it should only be the headers
-            lineparts = csvline.split(',')
-            try:
-                assert(header_quant == len(lineparts))
-            except AssertionError:
-                print('Whoa! at line {} in {} '.format(numer, fpath))
-                print('(looks like) {}'.format(csvline))
-                print(' there are {} header-keys but {} values'.format(header_quant, len(lineparts)))
-                print(' exiting now so you may fix the CSV file.')
-                exit(0)
-            csvdocs[numer] = {h: cell.strip() for h, cell in zip(headers, lineparts)}
-    print('{} items are to be gleaned from this CSV file: {}'.format(numer, fpath))
-
-    # user chooses the kind of invoice being imported
-
+            if csvdocs:
+                importedfn.update(hdrstring)
+                stuffdb.update(csvdocs)
+"""
     # assign correct info to correct keys for insertion into current db collection
-    addlist = []
-    for itemdd in csvdocs.viewvalues():
-        csvstuff = {}
-        # GWk come from manufacturer's csv-headers, dbv are in mongo database
-        for GWk, dbv in xmarks.atlas['GAWmap'].viewitems():
-            if GWk in itemdd:
-                csvstuff[dbv] = itemdd[GWk]
-        addlist.append(csvstuff)
-    # also we want the best fit in case some CSVs share column names
-    # make report to get what we don't have
+        addlist = []
+        for itemdd in csvdocs:
+            csvstuff = {}
+            # GWk come from manufacturer's csv-headers, dbv are in mongo database
+            for GWk, dbv in xmarks.atlas['GAWmap'].viewitems():
+                if GWk in itemdd:
+                    csvstuff[dbv] = itemdd[GWk]
+            addlist.append(csvstuff)
+        # also we want the best fit in case some CSVs share column names
+        # make report to get what we don't have
 
     # first fix formats and types to conform
     ctr = 0
@@ -320,7 +303,7 @@ if __name__ == "__main__":
         if not FOUND:
             with open('/home/suber1/Desktop/order.txt', 'ab') as ofob:
                 ofob.write("{} - item: {:11} {:7} {} \n".format(ctr, item[u'sku'], item[u'price'], item[u'name']))
-
+"""
     print("there are {} items to be added / updated".format(len(addlist)))
     # assign/map parsed out headers to current database categories
     # perhaps we just have a text file with the mappings that are valid.
