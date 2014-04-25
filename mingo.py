@@ -3,14 +3,11 @@ __author__ = 'suber1'
 1) allow import of all csv-style sheets via user created templates
 2) templates are stored in database along with the data and a record of imported file-names
 3) templates can be found by a header-string that matches against the incoming header
-    if no match, user is prompted to provide the mapping of headers-to-categories
+    if no match, user is prompted to provide the mapping of headers-to-db-collection-columns
 
 """
-import pymongo
 from pymongo import MongoClient
-from collections import OrderedDict, Counter
 import os
-import glob
 from pprint import pprint
 import cPickle
 
@@ -75,10 +72,11 @@ def headcheck(hdrlist, prev_mapped):
 
 class CsvMapped(dict):
     """
-    Enable persistent pairing of parsed CSV-parts to Mongodb collection dicts.
-    Some mappings are defined here and also load, if available,
-    pickled mappings created during runtime by user in interactive
-    matching process.
+    Presents persistent pairing (& pickling) of parsed CSV-parts to Mongodb
+    collection dicts.  Mappings can be defined here and also load, if available,
+    pickled mappings created earlier during interactive matching process. Goal is
+    to map a csv-source file to database once & from that time forward, have
+    similar documents automatically recognized, even if database is unavailable.
     """
     def __init__(self, atlas={}, mapfile='passed_in_csv_headers.pkl'):
         """
@@ -87,6 +85,8 @@ class CsvMapped(dict):
         try:
             assert(isinstance(atlas, dict))
         except AssertionError:
+            print("If used, the atlas param should be a dict mapping csv-file-types")
+            print("to dictionaries like: {csv-header: db-category, ...}")
             print("A non-dict was passed to CsvMapped via atlas: ")
             pprint(atlas)
             exit(0)
@@ -95,25 +95,23 @@ class CsvMapped(dict):
                 try:
                     assert(isinstance(elem, dict))
                 except AssertionError:
-                    print("A value of an Atlas-key is not a dict: ")
+                    print("A value of an atlas-value is not a dict: ")
                     pprint(elem)
                     exit(0)
+            # all good? preserve passed in atlas for later backtracking
             with open(mapfile, 'wB') as mapfob:
                 cPickle.dump(atlas, mapfob, cPickle.HIGHEST_PROTOCOL)
         else:
-            with open(mapfile, 'rB') as mapfob:
-                atlas = cPickle.load(mapfob)
-
-        atlas.update(dict(
-            GAWmap={'SHORT CODE': u'product_code', 'BARCODE': u'sku', 'US Trade': u'cost',
-                    'US MSRP': u'price', 'long_description': u'name', 'Reorder': u'description'},
-
-            GAWinvoice={'Trade': u'cost', 'MSRP': u'price', 'Description': u'name',
-                        'CODE': u'product_code', 'Qty': u''},
-
-            SouthHobbyInv={'SKU': u'product_code', 'desc': u'name'}
-        ))
+            # if atlas is empty, open pickle if we can
+            if os.path.exists(mapfile):
+                try:
+                    with open(mapfile, 'rB') as mapfob:
+                        atlas = cPickle.load(mapfob)
+                except IOError:
+                    print(" {} was given as a pickle-file for atlas-csv-header-maps, ".format(mapfile))
+                    print(" but it isn't a pickle.  Moving on...")
         self.atlas = atlas
+        self.pickle_fn = mapfile
 
     def headers_to_mongo(self, db):
         """
@@ -131,7 +129,6 @@ class CsvMapped(dict):
 
 if __name__ == "__main__":
     looking_for = '*.csv'
-    csv_dir = 'Documents'
     #dbserverip = '192.168.0.105'
     dbserverip = 'localhost'
     dbserverport = 27017
@@ -144,8 +141,10 @@ if __name__ == "__main__":
     importedfn = overalldb['imported_flnms']
 
     # paths to CSV files,
-    user = os.path.join(os.path.expanduser('~'), csv_dir)
-    fn_dd = {ctr: fn for ctr, fn in enumerate(glob.glob(user + os.sep + looking_for))}
+    csvfiles = [os.path.join(root, filename)
+                for root, dirnames, filenames in os.walk(os.path.expanduser('~'))
+                for filename in filenames if filename.endswith(looking_for)]
+    fn_dd = {ctr: fn for ctr, fn in enumerate(csvfiles)}
 
     # create unique key for filename to prevent re-import of the same data
     longfnkey = {}
@@ -156,11 +155,17 @@ if __name__ == "__main__":
     alreadyused = []
     examining = longfnkey.keys()
     for checking in importedfn.find():
+        # todo: don't forget to update database with filenames we use later!
         if checking in examining:
-            alreadyused.append(longfnkey[checking])
-            print('Already Imported: {}'.format(longfnkey[checking]))
-    print('list of those already used: {}'.format(alreadyused))
-    fn_dd.update({len(fn_dd): ' - NONE - '})
+            deadnum = longfnkey[checking]
+            alreadyused.append(deadnum)
+            print('{:4} Already Imported: {}'.format(deadnum, fn_dd.pop(deadnum)))
+    print("There are {} files with extension {} we have already imported into database"
+          .format(len(alreadyused), looking_for))
+    # re-index choices into consecutive digits
+    # add in an option to not do anything
+    showfn_dd = {num: fnp for num, fnp in zip(xrange(len(fn_dd)), fn_dd.values())}
+    showfn_dd.update({len(fn_dd): ' - NONE - '})
 
     # now have user choose one:
     YOUMAYPASS = False
