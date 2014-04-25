@@ -28,7 +28,7 @@ def selections(dd=None, prompt='Choose from above'):
         if len(dd) > 1:
             q = int(str(raw_input(prompt)))
         else:
-            print('only one choice... ')
+            print('only one choice.. ')
             q = 1
     return q - 1, dd[q - 1]
 
