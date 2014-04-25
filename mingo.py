@@ -158,10 +158,13 @@ class CsvMapped(dict):
         return showfn_dd
 
     def construct_header(self, fpath, online=0, spliton=','):
+        """
+        return strung-together representation of the column headers in a csv file
+        """
         with open(fpath, 'rU') as fob:
             self.thetext = fob.read().splitlines()
-        
-        return "|".join([h.strip() for h in self.thetext[online].split(spliton)])
+
+        return "!|!".join([h.strip() for h in self.thetext[online].split(spliton)])
 
     def headers_to_mongo(self, db):
         """
@@ -178,7 +181,6 @@ class CsvMapped(dict):
 
 
 if __name__ == "__main__":
-
     #dbserverip = '192.168.0.105'
     dbserverip = 'localhost'
     dbserverport = 27017
@@ -208,23 +210,23 @@ if __name__ == "__main__":
         selnum, fpath = selections(new_fn_dd, prompt='Above are saved CSV files you can add to mongod. Choose wisely: ')
         if selnum != (len(new_fn_dd) - 1):
             # open file, determine header
-            hdrs, np = '', 0
+            #  side effect: text body inside CsvMapped instance
+            hdrstring, np = '', 0
             while not hdrs:
-                hdrs = xmarks.construct_header(fpath, online=np)
+                hdrstring = xmarks.construct_header(fpath, online=np)
                 np += 1
                 if np > 60:
-
+                    print("Breaking out due to a lot of blank lines instead of headers")
+                    break
+            print("Headline: #{:3} {}".format(np, hdrstring))
             # look up header in database to find import map
+            importmap = hdrs[hdrstring].find_one()
             # if no import-map, create the import-map
+            if not importmap:
+
                 #including some rules about adding, subtracting quantities
             # using the import-map, import the data
             # on success, add the input filename to database of imported_fn, re-run csv-sources
-
-    #
-
-    print('There are {} column-headers in {}: '.format(header_quant, fpath))
-    print(" |".join(headers))
-    print(" so... ")
 
     # parse csv-file contents into dict of dict-keyed-by-csv-headers:
     numer = 0
@@ -243,11 +245,6 @@ if __name__ == "__main__":
                 exit(0)
             csvdocs[numer] = {h: cell.strip() for h, cell in zip(headers, lineparts)}
     print('{} items are to be gleaned from this CSV file: {}'.format(numer, fpath))
-
-
-
-    # check if a mapping already has been made fitting some CSV-derived columns
-    # (skipping above)
 
     # user chooses the kind of invoice being imported
 
