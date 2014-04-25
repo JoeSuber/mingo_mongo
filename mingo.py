@@ -1,4 +1,11 @@
 __author__ = 'suber1'
+"""
+1) allow import of all csv-style sheets via user created templates
+2) templates are stored in database along with the data and a record of imported file-names
+3) templates can be found by a header-string that matches against the incoming header
+    if no match, user is prompted to provide the mapping of headers-to-categories
+
+"""
 import pymongo
 from pymongo import MongoClient
 from collections import OrderedDict, Counter
@@ -140,18 +147,18 @@ if __name__ == "__main__":
     user = os.path.join(os.path.expanduser('~'), csv_dir)
     fn_dd = {ctr: fn for ctr, fn in enumerate(glob.glob(user + os.sep + looking_for))}
 
-    # create unique key for file to prevent re-import of the same data
+    # create unique key for filename to prevent re-import of the same data
     longfnkey = {}
     for num, fnv in fn_dd.viewitems():
-        longfnkey.update({str(fnv + [p for p in dir(os.stat(fnv)) if 'st' in p]): num})
+        longfnkey.update({unicode(fnv + '|' + unicode(os.stat(fnv).st_ctime)): num})
 
-    # check database against filenames
+    # check already used 'imported_flnms' database against glob filenames
     alreadyused = []
     examining = longfnkey.keys()
     for checking in importedfn.find():
         if checking in examining:
-            alreadyused.append(fn_dd[longfnkey[checking]])
-
+            alreadyused.append(longfnkey[checking])
+            print('Already Imported: {}'.format(longfnkey[checking]))
     print('list of those already used: {}'.format(alreadyused))
     fn_dd.update({len(fn_dd): ' - NONE - '})
 
@@ -166,7 +173,7 @@ if __name__ == "__main__":
             YOUMAYPASS = True
             print(" You chose wisely: {}".format(fpath))
 
-
+    #
     print('opening: {}'.format(fpath))
     with open(fpath, 'rU') as fob:
         thetext = fob.read().splitlines()
