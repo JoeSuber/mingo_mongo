@@ -22,9 +22,9 @@ def selections(dd=None, prompt='Choose from above'):
         print('selections: empty choice dictionary, returning 0')
         return 0, {}
     for choice, dbnm in dd.viewitems():
-        print('{:4}- {}'.format(choice+1, dbnm))
+        print('{:4}- {}'.format(choice + 1, dbnm))
     q = 0
-    while (q < 1) or (q > (choice+1)):
+    while (q < 1) or (q > (choice + 1)):
         if len(dd) > 1:
             q = int(str(raw_input(prompt)))
         else:
@@ -240,7 +240,7 @@ if __name__ == "__main__":
 
     # now have user choose one until none left or done:
     selnum = 0
-    while selnum != (len(new_fn_dd) - 1):
+    while selnum != (len(new_fn_dd)):
         selnum, fpath = selections(new_fn_dd, prompt='Above are saved CSV files you can add to mongod. Choose wisely: ')
         if selnum != (len(new_fn_dd) - 1):
             # open file, determine header
@@ -267,9 +267,9 @@ if __name__ == "__main__":
             if csvdocs:
                 importedfn.update(hdrstring)
                 stuffdb.update(csvdocs)
-    """
     # assign correct info to correct keys for insertion into current db collection
         addlist = []
+    """
         for itemdd in csvdocs:
             csvstuff = {}
             # GWk come from manufacturer's csv-headers, dbv are in mongo database
