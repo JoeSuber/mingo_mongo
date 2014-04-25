@@ -11,6 +11,7 @@ import os
 from pprint import pprint
 import cPickle
 
+
 def selections(dd=None, prompt='Choose from above'):
     """
     given dict of numbered options like {1: 'choose me', ...}
@@ -31,6 +32,7 @@ def selections(dd=None, prompt='Choose from above'):
             q = 1
     return q - 1, dd[q - 1]
 
+
 def explore(done, client):
     """
     Allow exploration of key:value storage in existing mongod instance
@@ -43,7 +45,7 @@ def explore(done, client):
         key, usedb_name = selections(clientnames, prompt='Choose the number of mongo db to be explored: ')
         print('okay - choice was {:3} - {} \n'.format(key+1, usedb_name))
         primarydb = client[usedb_name]
-        primaries = {num: pri for num, pri in enumerate(primarydb.collection_names())}
+        primaries = {num: unicode(pri) for num, pri in enumerate(primarydb.collection_names())}
         key, collection_name = selections(primaries, prompt='Choose the collection within {} to explore: '.format(usedb_name))
         print('okay - choice was {:3} - {} \n'.format(key+1, collection_name))
         thestuffdb = primarydb[collection_name]
@@ -265,7 +267,7 @@ if __name__ == "__main__":
             if csvdocs:
                 importedfn.update(hdrstring)
                 stuffdb.update(csvdocs)
-"""
+    """
     # assign correct info to correct keys for insertion into current db collection
         addlist = []
         for itemdd in csvdocs:
@@ -303,7 +305,7 @@ if __name__ == "__main__":
         if not FOUND:
             with open('/home/suber1/Desktop/order.txt', 'ab') as ofob:
                 ofob.write("{} - item: {:11} {:7} {} \n".format(ctr, item[u'sku'], item[u'price'], item[u'name']))
-"""
+    """
     print("there are {} items to be added / updated".format(len(addlist)))
     # assign/map parsed out headers to current database categories
     # perhaps we just have a text file with the mappings that are valid.
