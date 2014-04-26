@@ -236,7 +236,7 @@ if __name__ == "__main__":
     # find database collection labels for 'explored' stuffdb
     labelset = set()
     for hp in stuffdb.find():
-        labelset = set(kk[0] for kk in hp.viewitems())
+        labelset.add(kk[0] for kk in hp.viewitems())
     print('labelset (from things already in db): ')
     pprint(labelset)
 
@@ -245,7 +245,7 @@ if __name__ == "__main__":
 
     # now have user choose one until none left or done:
     selnum = 0
-    while selnum != (len(new_fn_dd)):
+    while not selnum:
         selnum, fpath = selections(new_fn_dd, prompt='Above are saved CSV files you can add to mongod. Choose wisely: ')
         if selnum != (len(new_fn_dd) - 1):
             # open file, determine header
@@ -311,10 +311,6 @@ if __name__ == "__main__":
             with open('/home/suber1/Desktop/order.txt', 'ab') as ofob:
                 ofob.write("{} - item: {:11} {:7} {} \n".format(ctr, item[u'sku'], item[u'price'], item[u'name']))
     """
-    print("there are {} items to be added / updated".format(len(addlist)))
-    # assign/map parsed out headers to current database categories
-    # perhaps we just have a text file with the mappings that are valid.
-    # if none are valid we will write to the file so they can be added
 
     print('Goodbye!')
     exit(0)
