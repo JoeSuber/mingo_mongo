@@ -4,6 +4,12 @@ __author__ = 'suber1'
 2) templates are stored in database along with the data and a record of imported file-names
 3) templates can be found by a header-string that matches against the incoming header
     if no match, user is prompted to provide the mapping of headers-to-db-collection-columns
+4) need some way to classify the action to be taken on a csv file:
+    a) adding new items, including barcode, product code, description...
+    b) adjusting inventory count for an item to the given number
+    c) adjusting inventory count +/- the given number
+    d) compare the csv against the database & report the differences
+5) scrape / interact with alliance / southern hobby / games-workshop / wizards ordering system
 
 """
 from pymongo import MongoClient
@@ -231,9 +237,8 @@ if __name__ == "__main__":
     labelset = set()
     for hp in stuffdb.find():
         labelset = set(kk[0] for kk in hp.viewitems())
-    print('labelset (from things already in db): {}'.format(labelset))
-
-    # do mappings map to database?
+    print('labelset (from things already in db): ')
+    pprint(labelset)
 
     # validate found source files for potential input into db
     new_fn_dd = xmarks.csvsources(importedfn, startdir=None, looking_for='*.csv')
