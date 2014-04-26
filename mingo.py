@@ -247,6 +247,9 @@ if __name__ == "__main__":
     selnum = 0
     while not selnum:
         selnum, fpath = selections(new_fn_dd, prompt='Above are saved CSV files you can add to mongod. Choose wisely: ')
+        if fpath == " - NONE - ":
+            print("All done!")
+            break
         if selnum != (len(new_fn_dd) - 1):
             # open file, determine header
             #  side effect: text body inside CsvMapped instance
