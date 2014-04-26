@@ -261,15 +261,16 @@ if __name__ == "__main__":
                     print("Breaking out due to a lot of blank lines instead of headers")
                     break
             print("Headline: #{:3} {}".format(np, hdrstring))
-                # look up header in database to find import map
+            # look up header in database to find import map
             importmap = hdrs[hdrstring].find_one()
+            pprint('importmap: ', importmap)
             # if no import-map, create the import-map:
             if not importmap:
                 importmap = xmarks.headers_to_mongo(hdrs, hdrstring)
                 if importmap:
                     hdrs[hdrstring].insert(importmap)
                 #including some rules about adding, subtracting quantities
-            # using the import-map, import the data
+            # using the import-map, import the csv data stored in the instance
             csvdocs = xmarks.parsedata(importmap, top_skip=np)
             # on success, add the input filename to database of imported_fn, re-run csv-sources
             if csvdocs:
