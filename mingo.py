@@ -112,12 +112,13 @@ class CsvMapped(dict):
         self.atlas = atlas
         self.pickle_fn = mapfile
         self.thetext = ''
+        self.spltr = '|!'
 
     def fn_ctime(self, fn):
         """
         attach c_time os-provided info to filename in a consistent way
         """
-        return unicode(fn + '|' + unicode(os.stat(fn).st_ctime))
+        return unicode(fn + self.spltr + unicode(os.stat(fn).st_ctime))
 
 
     def csvsources(self, usedcsvdb, startdir=None, looking_for='.csv'):
@@ -166,7 +167,7 @@ class CsvMapped(dict):
         """
         with open(fpath, 'rU') as fob:
             self.thetext = fob.read().splitlines()
-        return "|!".join([h.strip() for h in self.thetext[online].split(spliton)])[:128]
+        return self.spltr.join([h.strip() for h in self.thetext[online].split(spliton)])[:128]
 
     def headers_to_mongo(self, db, hstrip):
         """
@@ -181,18 +182,18 @@ class CsvMapped(dict):
                    u'desc_short', u'date_modified', u'_id', u'quant_in_stock', u'quant_min',
                    u'quant_max', u'quant_on_order', u'sku', u'order_history', u'receive_hist',
                    u'increment_quant', u'decrement_quant']
-        hdrlist = {kk: vv for kk, vv in enumerate(hstrip.split('!|!'))}
+        hdrlist = {kk: vv for kk, vv in enumerate(hstrip.split(self.spltr))}
         hdrlist.update({len(hdrlist): ' - NO MATCH - ', len(hdrlist)+1: ' - START OVER - '})
         pprint(catlist)
         genmap = {}
         for dbcat in catlist:
             print()
-            selnum, selcategory = selections(hdrlist, prompt='proper match for {}'.format(dbcat))
+            selnum, selcategory = selections(hdrlist, prompt='proper match for {}: '.format(dbcat))
             if selcategory != ' - NO MATCH - ':
                 if selcategory == ' - START OVER - ':
                     return self.headers_to_mongo(db, hstrip)
                 genmap[selcategory] = dbcat
-                hdrlist.pop(selcategory)
+                hdrlist.pop(selnum)
                 if len(hdrlist) < 2:
                     break
         self.atlas[hstrip] = genmap
@@ -267,7 +268,8 @@ if __name__ == "__main__":
             print("Headline: #{:3} {}".format(np, hdrstring))
             # look up header in database to find import map
             importmap = hdrs[hdrstring].find_one()
-            pprint('importmap: ', importmap)
+            print('importmap (at {}): '.format(hdrstring))
+            pprint(importmap)
             # if no import-map, create the import-map:
             if not importmap:
                 importmap = xmarks.headers_to_mongo(hdrs, hdrstring)
