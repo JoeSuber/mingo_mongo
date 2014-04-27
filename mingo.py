@@ -132,6 +132,8 @@ class CsvMapped(dict):
         csvfiles = [os.path.join(root, filename)
                     for root, dirnames, filenames in os.walk(startdir)
                     for filename in filenames if filename.endswith(looking_for)]
+        print('csvfiles from csvsources: ')
+        pprint(csvfiles)
         fn_dd = {ctr: fn for ctr, fn in enumerate(csvfiles)}
 
         # create unique key for filename to prevent re-import of the same data
@@ -142,6 +144,7 @@ class CsvMapped(dict):
         # check already used 'imported_flnms' database against glob filenames
         alreadyused = []
         examining = longfnkey.keys()
+        pprint('longfnkey.keys() =', examining)
         for checking in usedcsvdb.find():
             # todo: don't forget to update database with filenames we use later!
             if checking in examining:
@@ -236,7 +239,7 @@ if __name__ == "__main__":
     # find database collection labels for 'explored' stuffdb
     labelset = set()
     for hp in stuffdb.find():
-        labelset.add(kk[0] for kk in hp.viewitems())
+        labelset = set(kk[0] for kk in hp.viewitems())
     print('labelset (from things already in db): ')
     pprint(labelset)
 
