@@ -181,14 +181,14 @@ class CsvMapped(dict):
                    u'manufacturer', u'sale_history', u'buy_history', u'barcode', u'we_buy_price',
                    u'desc_short', u'date_modified', u'_id', u'quant_in_stock', u'quant_min',
                    u'quant_max', u'quant_on_order', u'sku', u'order_history', u'receive_hist',
-                   u'increment_quant', u'decrement_quant']
+                   u'increment_quant', u'decrement_quant', u'physical_count']
         hdrlist = {kk: vv for kk, vv in enumerate(hstrip.split(self.spltr))}
         hdrlist.update({len(hdrlist): ' - NO MATCH - ', len(hdrlist)+1: ' - START OVER - '})
         pprint(catlist)
         genmap = {}
         for dbcat in catlist:
             print()
-            selnum, selcategory = selections(hdrlist, prompt='proper match for {}: '.format(dbcat))
+            selnum, selcategory = selections(hdrlist, prompt='-HEADER MAPPING- Match for |{}| : '.format(dbcat))
             if selcategory != ' - NO MATCH - ':
                 if selcategory == ' - START OVER - ':
                     return self.headers_to_mongo(db, hstrip)
@@ -197,7 +197,7 @@ class CsvMapped(dict):
                 # auto-done if only things left are  '- NO MATCH -'  and '- START OVER -'
                 if len(hdrlist) < 2:
                     break
-        # assign just-generated header-map to the strung-together version of the csv-top-line
+        # assign just-generated header-map to the key=strung-together version of the csv-top-line
         self.atlas[hstrip] = genmap
         with open(self.pickle_fn, 'wB') as hfob:
             cPickle.dump(self.atlas, hfob, cPickle.HIGHEST_PROTOCOL)
@@ -224,7 +224,6 @@ class CsvMapped(dict):
                 csvdocs.append({h: cell.strip() for h, cell in zip(headers.values(), lineparts)})
         print('{} items are to be gleaned from this CSV file: {}'.format(numer, fpath))
         return csvdocs
-
 
 
 if __name__ == "__main__":
@@ -270,14 +269,16 @@ if __name__ == "__main__":
             print("Headline: #{:3} {}".format(np, hdrstring))
             # look up header in database to find import map
             importmap = hdrs[hdrstring].find_one()
-            print('importmap (at {}): '.format(hdrstring))
+            print('importmap (keyed by: {}): '.format(hdrstring))
             pprint(importmap)
             # if no import-map, create the import-map:
             if not importmap:
                 importmap = xmarks.headers_to_mongo(hdrs, hdrstring)
                 if importmap:
+                    print('hdrstring: {}'.format(hdrstring))
+                    print('importmap: {}'.format(importmap))
                     hdrs[hdrstring].insert(importmap)
-                #including some rules about adding, subtracting quantities
+                    # need to include some rules about adding, subtracting quantities
             # using the import-map, import the csv data stored in the instance
             csvdocs = xmarks.parsedata(importmap, top_skip=np)
             # on success, add the input filename to database of imported_fn, re-run csv-sources
