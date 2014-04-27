@@ -166,7 +166,7 @@ class CsvMapped(dict):
         """
         with open(fpath, 'rU') as fob:
             self.thetext = fob.read().splitlines()
-        return "!|!".join([h.strip() for h in self.thetext[online].split(spliton)])
+        return "|!".join([h.strip() for h in self.thetext[online].split(spliton)])[:128]
 
     def headers_to_mongo(self, db, hstrip):
         """
