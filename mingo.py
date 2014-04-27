@@ -120,14 +120,14 @@ class CsvMapped(dict):
         return unicode(fn + '|' + unicode(os.stat(fn).st_ctime))
 
 
-    def csvsources(self, usedcsvdb, startdir=None, looking_for='*.csv'):
+    def csvsources(self, usedcsvdb, startdir=None, looking_for='.csv'):
         """
         gather and track the input data (saved in csv format) for
          later importation into the mongodb. Return only valid choices as dict.
         """
         if not startdir:
             startdir = os.path.expanduser('~')
-
+        print("started looking for {} from {}".format(looking_for, startdir))
         # paths to CSV files,
         csvfiles = [os.path.join(root, filename)
                     for root, dirnames, filenames in os.walk(startdir)
@@ -144,7 +144,8 @@ class CsvMapped(dict):
         # check already used 'imported_flnms' database against glob filenames
         alreadyused = []
         examining = longfnkey.keys()
-        pprint('longfnkey.keys() =', examining)
+        print('longfnkey.keys() =')
+        pprint(examining)
         for checking in usedcsvdb.find():
             # todo: don't forget to update database with filenames we use later!
             if checking in examining:
@@ -244,7 +245,7 @@ if __name__ == "__main__":
     pprint(labelset)
 
     # validate found source files for potential input into db
-    new_fn_dd = xmarks.csvsources(importedfn, startdir=None, looking_for='*.csv')
+    new_fn_dd = xmarks.csvsources(importedfn, startdir=None, looking_for='.csv')
 
     # now have user choose one until none left or done:
     selnum = 0
