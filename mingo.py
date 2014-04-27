@@ -194,8 +194,10 @@ class CsvMapped(dict):
                     return self.headers_to_mongo(db, hstrip)
                 genmap[selcategory] = dbcat
                 hdrlist.pop(selnum)
+                # auto-done if only things left are  '- NO MATCH -'  and '- START OVER -'
                 if len(hdrlist) < 2:
                     break
+        # assign just-generated header-map to the strung-together version of the csv-top-line
         self.atlas[hstrip] = genmap
         with open(self.pickle_fn, 'wB') as hfob:
             cPickle.dump(self.atlas, hfob, cPickle.HIGHEST_PROTOCOL)
