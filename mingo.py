@@ -39,6 +39,30 @@ def selections(dd=None, prompt='Choose from above'):
     return q - 1, dd[q - 1]
 
 
+def createdbnames(dbd=None):
+    """
+    my pie-in-the-sky plans to automate all the drudge and operate using real data
+    """
+    if not dbd:
+        dbd = {u'manufacturer': [u'GAW', u'Games_Workshop', u'WIZ', u'Wizards_of_the_Coast', u'CHX', u'Chessex'],
+               u'my_customers': [u'my_cust_id', u'email', u'requested_this', u'pre_paid_for', u'credit_file',
+                                 u'face_rec', u'purchased', u'returned', u'ebay_notes', u'paid_on_invoice',
+                                 u'shipped_out_date', u'ship_tracked', u'ship_rcvd', u'notes'],
+               u'my_interns': [u'contact', u'email', u'schedule_past', u'schedule_fut', u'good_things', u'bad_things'],
+               u'item_sales_history': [u'we_sold_history', u'we_buy_history', u'receive_hist', u'cust_place_pre_order',
+                                       u'cust_place_back_order', u'description', u'sku_for1' u'back_at_zero_dates'],
+               u'store_inventory': [u'description', u'we_sell_price', u'multipack_sku',
+                                    u'multipack_quant', u'multiprice', u'manufacturer', u'barcode', u'we_buy_cost',
+                                    u'date_modified', u'quant_on_invoice', u'sku_for1', u'mfr_3letter', u'sku_alliance',
+                                    u'sku_alt', u'incremented_quant', u'decremented_quant', u'notes'],
+               u'stocking': [u'_id', u'description', u'we_bought_history', u'we_sold_history', u'date_added_toinv',
+                             u'prefer_dist_list', u'quant_want_min', u'quant_want_max', u'quant_on_reorder',
+                             u'dist_alerts', u'velocity'],
+               u'import_headers': {u'gg': u'gogo', u'hh': u'hoho', u'ii': u'ioio'}, }
+
+        return dbd
+
+
 def explore(done, client):
     """
     Allow exploration of key:value storage in existing mongod instance
@@ -111,13 +135,17 @@ class CsvMapped(dict):
                     print(" but it isn't a pickle.  Moving on...")
         self.atlas = atlas
         self.pickle_fn = mapfile
+        self.fpath = ''
         self.thetext = ''
         self.spltr = '|!'
-        self.catlist = [u'date_added', u'desc_long', u'price_we_sell', u'product_code',
-                        u'manufacturer', u'sale_history', u'buy_history', u'barcode', u'we_buy_price',
-                        u'desc_short', u'date_modified', u'_id', u'quant_in_stock', u'quant_min',
-                        u'quant_max', u'quant_on_order', u'sku', u'order_history', u'receive_hist',
-                        u'increment_quant', u'decrement_quant', u'physical_count']
+        self.defmark = '(@)'
+        #self.catlist = [u'date_added', u'description', u'price_we_sell', u'product_code',
+        #                u'manufacturer', u'barcode', u'we_buy_price', u'prefer_dist_list',
+        #                u'date_modified', u'_id', u'quant_pre_order', u'quant_want_min',
+        #                u'quant_want_max', u'quant_on_reorder', u'sku', u'alliance_sku',
+        #                u'southern_sku', u'we_buy_history', u'we_sell_history'
+        #                u'incremented_quant', u'decremented_quant', u'physical_count']
+        self.catlist = createdbnames()[u'store_inventory']
 
     def fn_ctime(self, fn):
         """
@@ -125,11 +153,10 @@ class CsvMapped(dict):
         """
         return unicode(fn + self.spltr + unicode(os.stat(fn).st_ctime))
 
-
     def csvsources(self, usedcsvdb, startdir=None, looking_for='.csv'):
         """
-        gather and track the input data (saved in csv format) for
-         later importation into the mongodb. Return only valid choices as dict.
+        gather and track the input data (received via csv format) for
+         later import into the mongodb. Return only valid choices as dict.
         """
         if not startdir:
             startdir = os.path.expanduser('~')
@@ -169,26 +196,32 @@ class CsvMapped(dict):
     def construct_header(self, fpath, online=0, spliton=','):
         """
         return strung-together representation of the column headers in a csv file
+        side effect: load into instance the whole of the text-file as a list of lines
         """
         with open(fpath, 'rU') as fob:
             self.thetext = fob.read().splitlines()
-        return self.spltr.join([h.strip() for h in self.thetext[online].split(spliton)])[:128]
+        self.fpath = fpath
+        return self.spltr.join([h.strip() for h in self.thetext[online].split(spliton)])
 
     def headers_to_mongo(self, db, hstrip):
         """
-        Here are the database inventory categories. Also interactively generates the
-        map to be saved and referenced by the header-string.
+        Interactively generates the map to be saved and referenced by the header-string.
         """
         if hstrip in self.atlas.viewkeys():
             print("Already assigned: {} ".format(hstrip))
             return self.atlas[hstrip]
-        catchoice = {kk: vv for kk, vv in enumerate(self.catlist)}
         hdrlist = {kk: vv for kk, vv in enumerate(hstrip.split(self.spltr))}
-        catchoice.update({len(hdrlist): ' - NOT USED - ', len(hdrlist)+1: ' - START OVER - '})
+        catchoice = {kk: vv for kk, vv in enumerate(self.catlist)}
+        catstart = len(catchoice)
+        catchoice.update({len(catchoice): ' - NOT USED - ', len(catchoice)+1: ' - START OVER - ',
+                          len(catchoice)+2: ' - FILL with something...'})
         pprint(catchoice)
+        catcutoff = len(catchoice) - catstart
         genmap = {}
-        for dbhdr in hdrlist.viewitems():
-            print(dbhdr)
+        total = len(hdrlist)
+        for togo, dbhdr in enumerate(hdrlist.viewitems()):
+            print('...............................................')
+            print('of {} columns in csv-file, we still must assign {} a place'.format(total, total - togo))
             selnum, selcategory = selections(catchoice,
                                              prompt='-HEADER MAPPING- Select Match for |{}| : '.format(dbhdr))
             if selcategory != ' - NOT USED - ':
@@ -196,12 +229,24 @@ class CsvMapped(dict):
                     return self.headers_to_mongo(db, hstrip)
                 genmap[selcategory] = dbhdr
                 catchoice.pop(selnum)
-                # auto-done if only things left are  '- NO MATCH -'  and '- START OVER -'
-                if len(hdrlist) < 2:
+                # auto-done if only things left are  '- NO MATCH -', '- START OVER -', etc
+                if len(catchoice) < catcutoff:
+                    print("We ran out of database categories before exhausting csv-columns")
+                    print("Now filling in defaults for remaining {} csv-columns...".format(total - togo))
+                    for dbhdr in hdrlist.viewitems():
+                        if dbhdr not in genmap:
+                            genmap[dbhdr] = dbhdr
                     break
             else:
+                # selcategory == ' - NOT USED - ', but we import anyway under csv-given column-name
                 genmap[dbhdr] = dbhdr
-                print("defaulting to import column name: {}".format(dbhdr))
+                print("importing column '|{}|' as: |{}|".format(dbhdr, dbhdr))
+
+        # finish out map with user-defined uniform defaults
+        if len(catchoice):
+            for leftnum, leftover in catchoice.viewitems():
+                genmap[leftover] = self.defmark + unicode(raw_input(
+                    prompt="Value for ALL '{}' :".format(leftover))).decode()
 
         # assign just-generated header-map to the key=strung-together version of the csv-top-line
         self.atlas[hstrip] = genmap
@@ -209,26 +254,45 @@ class CsvMapped(dict):
             cPickle.dump(self.atlas, hfob, cPickle.HIGHEST_PROTOCOL)
         return genmap
 
+    def ask_where_join(self, lpl):
+        qlpl = {num: pp for num, pp in enumerate(lpl)}
+        pnum1, part1 = selections(qlpl, prompt='choose first part to join : ')
+        pnum2, part2 = selections(qlpl, prompt='okay! now choose second part : ')
+        qlpl[pnum1] = part1 + part2
+        qlpl.pop(part2)
+        opl = []
+        for n in xrange(len(qlpl)+1):
+            if n in qlpl:
+                opl.append(qlpl[n])
+        return opl
+
     def parsedata(self, headers, top_skip=0):
         """
         the previously read file, a list of lines, is split out by comma, assigned to dict
         """
-        header_quant = len(headers)
+        extra_defs = [val.replace(self.defmark, '') for val in headers.viewvalues() if self.defmark in val]
+        header_quant = len(headers) + len(extra_defs)
         numer = 0
         csvdocs = []
         for numer, csvline in enumerate(self.thetext):
             if numer >= top_skip:       # skipping line zero as it should only be the headers
-                lineparts = csvline.split(',')
+                lineparts = csvline.split(',').extend(extra_defs)
                 try:
                     assert(header_quant == len(lineparts))
                 except AssertionError:
-                    print('Whoa! at line {} in {} '.format(numer, fpath))
+                    print('Whoa! at line {} in {} '.format(numer, self.fpath))
                     print('(looks like) {}'.format(csvline))
                     print(' there are {} header-keys but {} values'.format(header_quant, len(lineparts)))
-                    print(' exiting now so you may fix the CSV file.')
-                    exit(0)
+                    if header_quant < len(lineparts):
+                        lineparts = self.ask_where_join(lineparts)
+                    else:
+                        print(' With more column-names than columns there must be something wrong')
+                        print(' with either the import-map or the imported file.')
+                        print(' Exiting now so you may fix the CSV file.')
+                        exit(0)
+
                 csvdocs.append({h: cell.strip() for h, cell in zip(headers.values(), lineparts)})
-        print('{} items are to be gleaned from this CSV file: {}'.format(numer, fpath))
+        print('{} items are to be gleaned from this CSV file: {}'.format(numer, self.fpath))
         return csvdocs
 
 
@@ -236,10 +300,14 @@ if __name__ == "__main__":
     #dbserverip = '192.168.0.105'
     dbserverip = 'localhost'
     dbserverport = 27017
-    xmarks = CsvMapped()
+    dbmap = createdbnames()
+    xmarks = CsvMapped(atlas=dbmap[u''])
+
+    # create some 'databases' in the MongoClient
+    client = MongoClient(dbserverip, dbserverport)
 
     # user chooses the database and collection we are messing with:
-    overalldb, stuffdb = explore(0, MongoClient(dbserverip, dbserverport))
+    overalldb, stuffdb = explore(0, client)
 
     # previously found mappings between CSV and DB columns:
     hdrs = overalldb['headers_map']
@@ -262,11 +330,12 @@ if __name__ == "__main__":
         if fpath == " - NONE - ":
             print("All done!")
             break
-        if selnum != (len(new_fn_dd) - 1):
+        if selnum != (len(new_fn_dd) - 1):  # ie, the last choice, - DONE -
             # open file, determine header
             #  side effect: text body inside CsvMapped instance
             hdrstring, np = '', 0
             while not hdrstring:
+                # go find headerstring on top of selected file
                 hdrstring = xmarks.construct_header(fpath, online=np)
                 np += 1
                 if np > 60:
