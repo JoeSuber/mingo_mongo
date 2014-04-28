@@ -54,7 +54,8 @@ def createdbnames(dbd=None):
                u'store_inventory': [u'description', u'we_sell_price', u'multipack_sku',
                                     u'multipack_quant', u'multiprice', u'manufacturer', u'barcode', u'we_buy_cost',
                                     u'date_modified', u'quant_on_invoice', u'sku_for1', u'mfr_3letter', u'sku_alliance',
-                                    u'sku_alt', u'incremented_quant', u'decremented_quant', u'notes'],
+                                    u'sku_alt', u'increment_quant', u'decrement_quant', u'current_whole_quant',
+                                    u'desired_quant', u'notes'],
                u'stocking': [u'_id', u'description', u'we_bought_history', u'we_sold_history', u'date_added_toinv',
                              u'prefer_dist_list', u'quant_want_min', u'quant_want_max', u'quant_on_reorder',
                              u'dist_alerts', u'velocity'],
@@ -213,7 +214,7 @@ class CsvMapped(dict):
         catchoice = {kk: vv for kk, vv in enumerate(self.catlist)}
         catstart = len(catchoice)
         catchoice.update({len(catchoice): ' - NOT USED - ', len(catchoice)+1: ' - START OVER - ',
-                          len(catchoice)+2: ' - FILL with something...'})
+                          len(catchoice)+2: ' - FILL with something'})
         pprint(catchoice)
         catcutoff = len(catchoice) - catstart
         genmap = {}
@@ -244,8 +245,9 @@ class CsvMapped(dict):
         # finish out map with user-defined uniform defaults
         if len(catchoice):
             for leftnum, leftover in catchoice.viewitems():
-                genmap[leftover] = self.defmark + unicode(raw_input(
-                    prompt=" ALL '{}' will map to : ".format(leftover))).decode()
+                if leftnum < (len(catchoice) - catcutoff):
+                    genmap[leftover] = self.defmark + unicode(raw_input(
+                        " ALL '{}' will map to : ".format(leftover))).decode()
 
         # assign just-generated header-map to the key=strung-together version of the csv-top-line
         self.atlas[hstrip] = genmap
@@ -305,10 +307,10 @@ if __name__ == "__main__":
     # create some 'databases' and 'collections' in the MongoClient
     client = MongoClient(dbserverip, dbserverport)
     currentdb = client.database_names()
-    for dbnm in dbmap.viewkeys():
+    for dbnm, dbvals in dbmap.viewitems():
         if dbnm not in currentdb:
-            dbb = client[dbnm].dbmap[dbnm]
-            print "added", dbb
+            dbb = client[dbnm].create_collection(dbnm)
+            print "added", dbb, dbvals
     print("created / verified databases named: ")
     print(client.database_names())
 
