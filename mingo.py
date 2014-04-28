@@ -58,8 +58,7 @@ def createdbnames(dbd=None):
                u'stocking': [u'_id', u'description', u'we_bought_history', u'we_sold_history', u'date_added_toinv',
                              u'prefer_dist_list', u'quant_want_min', u'quant_want_max', u'quant_on_reorder',
                              u'dist_alerts', u'velocity'],
-               u'import_headers': {u'gg': u'gogo', u'hh': u'hoho', u'ii': u'ioio'}, }
-
+               u'import_headers': {u'gg|!hh|!ii|!': {u'gg': u'gogo', u'hh': u'hoho', u'ii': u'ioio'}}, }
         return dbd
 
 
@@ -246,7 +245,7 @@ class CsvMapped(dict):
         if len(catchoice):
             for leftnum, leftover in catchoice.viewitems():
                 genmap[leftover] = self.defmark + unicode(raw_input(
-                    prompt="Value for ALL '{}' :".format(leftover))).decode()
+                    prompt=" ALL '{}' will map to : ".format(leftover))).decode()
 
         # assign just-generated header-map to the key=strung-together version of the csv-top-line
         self.atlas[hstrip] = genmap
@@ -301,17 +300,23 @@ if __name__ == "__main__":
     dbserverip = 'localhost'
     dbserverport = 27017
     dbmap = createdbnames()
-    xmarks = CsvMapped(atlas=dbmap[u''])
+    xmarks = CsvMapped(atlas=dbmap)
 
-    # create some 'databases' in the MongoClient
+    # create some 'databases' and 'collections' in the MongoClient
     client = MongoClient(dbserverip, dbserverport)
+    currentdb = client.database_names()
+    for dbnm in dbmap.viewkeys():
+        if dbnm not in currentdb:
+            client[dbnm].create_collection(dbmap[dbnm])
+    print("created / verified databases named: ")
+    print(client.database_names())
 
     # user chooses the database and collection we are messing with:
     overalldb, stuffdb = explore(0, client)
 
     # previously found mappings between CSV and DB columns:
-    hdrs = overalldb['headers_map']
-    importedfn = overalldb['imported_flnms']
+    hdrs = overalldb[u'import_headers']
+    importedfn = overalldb[u'imported_flnms']
 
     # find database collection labels for 'explored' stuffdb
     labelset = set()
