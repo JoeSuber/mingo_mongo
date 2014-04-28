@@ -307,7 +307,8 @@ if __name__ == "__main__":
     currentdb = client.database_names()
     for dbnm in dbmap.viewkeys():
         if dbnm not in currentdb:
-            dbb = client.dbnm
+            dbb = client[dbnm].dbmap[dbnm]
+            print "added", dbb
     print("created / verified databases named: ")
     print(client.database_names())
 
