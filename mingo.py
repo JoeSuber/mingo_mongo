@@ -26,7 +26,7 @@ def selections(dd=None, prompt='Choose from above'):
     choice = 1
     if not dd:
         print('selections: empty choice dictionary, returning 0')
-        return 0, {}
+        return 0, '- EMPTY -'
     for choice, dbnm in dd.viewitems():
         print('{:4}- {}'.format(choice + 1, dbnm))
     q = 0
@@ -307,9 +307,7 @@ if __name__ == "__main__":
     currentdb = client.database_names()
     for dbnm in dbmap.viewkeys():
         if dbnm not in currentdb:
-            print("trying {}".format(dbnm))
-            client.nodes.add(dbnm)
-            client.dbnm.dbmap.insert(dbnm)
+            dbb = client.dbnm
     print("created / verified databases named: ")
     print(client.database_names())
 
