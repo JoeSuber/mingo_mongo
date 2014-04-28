@@ -219,7 +219,7 @@ class CsvMapped(dict):
         catcutoff = len(catchoice) - catstart
         genmap = {}
         total = len(hdrlist)
-        for togo, dbhdr in enumerate(hdrlist.viewitems()):
+        for togo, (dbhdrkey, dbhdr) in enumerate(hdrlist.viewitems()):
             print('...............................................')
             print('of {} columns in csv-file, we still must assign {} a place'.format(total, total - togo))
             selnum, selcategory = selections(catchoice,
@@ -271,7 +271,15 @@ class CsvMapped(dict):
         """
         the previously read file, a list of lines, is split out by comma, assigned to dict
         """
-        extra_defs = [val.replace(self.defmark, '') for val in headers.viewvalues() if self.defmark in val]
+        extra_defs = []
+        for val in headers.viewvalues():
+            if isinstance(val, (basestring, unicode)) and (self.defmark in val):
+                val.replace(self.defmark, "")
+                if val == "":
+                    pass
+                else:
+                    extra_defs.append(val)
+                    print extra_defs, val
         header_quant = len(headers) + len(extra_defs)
         numer = 0
         csvdocs = []
