@@ -58,7 +58,7 @@ def createdbnames(dbd=None):
                u'stocking': [u'_id', u'description', u'we_bought_history', u'we_sold_history', u'date_added_toinv',
                              u'prefer_dist_list', u'quant_want_min', u'quant_want_max', u'quant_on_reorder',
                              u'dist_alerts', u'velocity'],
-               u'import_headers': {u'gg|!hh|!ii|!': {u'gg': u'gogo', u'hh': u'hoho', u'ii': u'ioio'}}, }
+               u'import_headers': {u'gg|!hh|!ii|!': {u'gg': u'gogo', u'hh': u'hoho', u'ii': u'ioio'}, }, }
         return dbd
 
 
@@ -300,14 +300,16 @@ if __name__ == "__main__":
     dbserverip = 'localhost'
     dbserverport = 27017
     dbmap = createdbnames()
-    xmarks = CsvMapped(atlas=dbmap)
+    xmarks = CsvMapped(atlas=dbmap[u'import_headers'])
 
     # create some 'databases' and 'collections' in the MongoClient
     client = MongoClient(dbserverip, dbserverport)
     currentdb = client.database_names()
     for dbnm in dbmap.viewkeys():
         if dbnm not in currentdb:
-            client[dbnm].create_collection(dbmap[dbnm])
+            print("trying {}".format(dbnm))
+            client.nodes.add(dbnm)
+            client.dbnm.dbmap.insert(dbnm)
     print("created / verified databases named: ")
     print(client.database_names())
 
