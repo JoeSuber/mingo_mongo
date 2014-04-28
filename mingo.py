@@ -77,7 +77,7 @@ class CsvMapped(dict):
     to map a csv-source file to database once & from that time forward, have
     similar documents automatically recognized, even if old database is unavailable.
     """
-    def __init__(self, atlas={}, mapfile='passed_in_csv_headers.pkl'):
+    def __init__(self, atlas={}, mapfile='pregen_csv_headers.pkl'):
         """
         :type atlas: dict
         """
@@ -113,6 +113,11 @@ class CsvMapped(dict):
         self.pickle_fn = mapfile
         self.thetext = ''
         self.spltr = '|!'
+        self.catlist = [u'date_added', u'desc_long', u'price_we_sell', u'product_code',
+                        u'manufacturer', u'sale_history', u'buy_history', u'barcode', u'we_buy_price',
+                        u'desc_short', u'date_modified', u'_id', u'quant_in_stock', u'quant_min',
+                        u'quant_max', u'quant_on_order', u'sku', u'order_history', u'receive_hist',
+                        u'increment_quant', u'decrement_quant', u'physical_count']
 
     def fn_ctime(self, fn):
         """
@@ -177,26 +182,27 @@ class CsvMapped(dict):
         if hstrip in self.atlas.viewkeys():
             print("Already assigned: {} ".format(hstrip))
             return self.atlas[hstrip]
-        catlist = [u'date_added', u'desc_long', u'price_we_sell', u'product_code',
-                   u'manufacturer', u'sale_history', u'buy_history', u'barcode', u'we_buy_price',
-                   u'desc_short', u'date_modified', u'_id', u'quant_in_stock', u'quant_min',
-                   u'quant_max', u'quant_on_order', u'sku', u'order_history', u'receive_hist',
-                   u'increment_quant', u'decrement_quant', u'physical_count']
+        catchoice = {kk: vv for kk, vv in enumerate(self.catlist)}
         hdrlist = {kk: vv for kk, vv in enumerate(hstrip.split(self.spltr))}
-        hdrlist.update({len(hdrlist): ' - NO MATCH - ', len(hdrlist)+1: ' - START OVER - '})
-        pprint(catlist)
+        catchoice.update({len(hdrlist): ' - NOT USED - ', len(hdrlist)+1: ' - START OVER - '})
+        pprint(catchoice)
         genmap = {}
-        for dbcat in catlist:
-            print()
-            selnum, selcategory = selections(hdrlist, prompt='-HEADER MAPPING- Match for |{}| : '.format(dbcat))
-            if selcategory != ' - NO MATCH - ':
+        for dbhdr in hdrlist.viewitems():
+            print(dbhdr)
+            selnum, selcategory = selections(catchoice,
+                                             prompt='-HEADER MAPPING- Select Match for |{}| : '.format(dbhdr))
+            if selcategory != ' - NOT USED - ':
                 if selcategory == ' - START OVER - ':
                     return self.headers_to_mongo(db, hstrip)
-                genmap[selcategory] = dbcat
-                hdrlist.pop(selnum)
+                genmap[selcategory] = dbhdr
+                catchoice.pop(selnum)
                 # auto-done if only things left are  '- NO MATCH -'  and '- START OVER -'
                 if len(hdrlist) < 2:
                     break
+            else:
+                genmap[dbhdr] = dbhdr
+                print("defaulting to import column name: {}".format(dbhdr))
+
         # assign just-generated header-map to the key=strung-together version of the csv-top-line
         self.atlas[hstrip] = genmap
         with open(self.pickle_fn, 'wB') as hfob:
