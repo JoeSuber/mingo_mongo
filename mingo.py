@@ -50,7 +50,7 @@ my pie-in-the-sky plans to automate all the drudge and operate using real data
                                  u'shipped_out_date', u'ship_tracked', u'ship_rcvd', u'notes'],
                u'my_interns': [u'contact', u'email', u'schedule_past', u'schedule_future', u'good_things', u'bad_things'],
                u'item_sales_history': [u'we_sold_history', u'we_buy_history', u'receive_hist', u'cust_place_pre_order',
-                                       u'cust_place_back_order', u'description', u'sku_for1' u'back_at_zero_dates'],
+                                       u'cust_place_back_order', u'description', u'sku_for1', u'back_at_zero_dates'],
                u'store_inventory': [u'description', u'we_sell_price', u'multipack_sku',
                                     u'multipack_quant', u'multiprice', u'manufacturer', u'barcode', u'we_buy_cost',
                                     u'date_modified', u'quant_on_invoice', u'sku_for1', u'mfr_3letter', u'sku_alliance',
