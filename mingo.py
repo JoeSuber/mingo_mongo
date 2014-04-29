@@ -3,12 +3,12 @@ __author__ = 'suber1'
 1) allow import of all csv-style data via user created templates
 2) templates are stored in database along with the data and a record of imported file-names
 3) templates can be found by a header-string that matches against the incoming header
-    if no match, user is prompted to provide the mapping of headers-to-db-collection-columns
+if no match, user is prompted to provide the mapping of headers-to-db-collection-columns
 4) need some way to classify the action to be taken on a csv file:
-    a) adding new items, including barcode, product code, description...
-    b) adjusting inventory count for an item to the given number
-    c) adjusting inventory count +/- the given number
-    d) compare the csv against the database & report the differences
+a) adding new items, including barcode, product code, description...
+b) adjusting inventory count for an item to the given number
+c) adjusting inventory count +/- the given number
+d) compare the csv against the database & report the differences
 5) scrape / interact with alliance / southern hobby / games-workshop / wizards ordering system
 
 """
@@ -96,7 +96,7 @@ def explore(done, client):
 class CsvMapped(dict):
     """
     Presents persistent pairing (& pickling) of parsed CSV-parts to Mongodb
-    collection dicts.  Mappings can be defined here and also load, if available,
+    collection dicts. Mappings can be defined here and also load, if available,
     pickled mappings created earlier during interactive matching process. Goal is
     to map a csv-source file to database once & from that time forward, have
     similar documents automatically recognized, even if old database is unavailable.
@@ -132,19 +132,19 @@ class CsvMapped(dict):
                         atlas = cPickle.load(mapfob)
                 except IOError:
                     print(" {} was given as a pickle-file for atlas-csv-header-maps, ".format(mapfile))
-                    print(" but it isn't a pickle.  Moving on...")
+                    print(" but it isn't a pickle. Moving on...")
         self.atlas = atlas
         self.pickle_fn = mapfile
         self.fpath = ''
         self.thetext = ''
         self.spltr = '|!'
-        self.defmark = '(@)'
+        self.defmark = u'(@)'
         #self.catlist = [u'date_added', u'description', u'price_we_sell', u'product_code',
-        #                u'manufacturer', u'barcode', u'we_buy_price', u'prefer_dist_list',
-        #                u'date_modified', u'_id', u'quant_pre_order', u'quant_want_min',
-        #                u'quant_want_max', u'quant_on_reorder', u'sku', u'alliance_sku',
-        #                u'southern_sku', u'we_buy_history', u'we_sell_history'
-        #                u'incremented_quant', u'decremented_quant', u'physical_count']
+        # u'manufacturer', u'barcode', u'we_buy_price', u'prefer_dist_list',
+        # u'date_modified', u'_id', u'quant_pre_order', u'quant_want_min',
+        # u'quant_want_max', u'quant_on_reorder', u'sku', u'alliance_sku',
+        # u'southern_sku', u'we_buy_history', u'we_sell_history'
+        # u'incremented_quant', u'decremented_quant', u'physical_count']
         self.catlist = createdbnames()[u'store_inventory']
 
     def fn_ctime(self, fn):
@@ -156,7 +156,7 @@ class CsvMapped(dict):
     def csvsources(self, usedcsvdb, startdir=None, looking_for='.csv'):
         """
         gather and track the input data (received via csv format) for
-         later import into the mongodb. Return only valid choices as dict.
+        later import into the mongodb. Return only valid choices as dict.
         """
         if not startdir:
             startdir = os.path.expanduser('~')
@@ -220,7 +220,7 @@ class CsvMapped(dict):
         genmap = {}
         total = len(hdrlist)
         for togo, (dbhdrkey, dbhdr) in enumerate(hdrlist.viewitems()):
-            print('...............................................')
+            print('.........................................................')
             print('of {} columns in csv-file, we still must assign {} a place'.format(total, total - togo))
             selnum, selcategory = selections(catchoice,
                                              prompt='-HEADER MAPPING- Select Match for |{}| : '.format(dbhdr))
@@ -229,7 +229,7 @@ class CsvMapped(dict):
                     return self.headers_to_mongo(db, hstrip)
                 genmap[selcategory] = dbhdr
                 catchoice.pop(selnum)
-                # auto-done if only things left are  '- NO MATCH -', '- START OVER -', etc
+                # auto-done if only things left are '- NO MATCH -', '- START OVER -', etc
                 if len(catchoice) < catcutoff:
                     print("We ran out of database categories before exhausting csv-columns")
                     print("Now filling in defaults for remaining {} csv-columns...".format(total - togo))
@@ -273,18 +273,18 @@ class CsvMapped(dict):
         """
         extra_defs = []
         for val in headers.viewvalues():
-            if isinstance(val, (basestring, unicode)) and (self.defmark in val):
+            if self.defmark in val:
                 val.replace(self.defmark, "")
                 if val == "":
                     pass
                 else:
                     extra_defs.append(val)
-                    print extra_defs, val
+                    print "parsedata says extra val is: ", val
         header_quant = len(headers) + len(extra_defs)
         numer = 0
         csvdocs = []
         for numer, csvline in enumerate(self.thetext):
-            if numer >= top_skip:       # skipping line zero as it should only be the headers
+            if numer >= top_skip:   # skipping line zero as it should only be the headers
                 lineparts = csvline.split(',').extend(extra_defs)
                 try:
                     assert(header_quant == len(lineparts))
@@ -299,9 +299,9 @@ class CsvMapped(dict):
                         print(' with either the import-map or the imported file.')
                         print(' Exiting now so you may fix the CSV file.')
                         exit(0)
-
                 csvdocs.append({h: cell.strip() for h, cell in zip(headers.values(), lineparts)})
-        print('{} items are to be gleaned from this CSV file: {}'.format(numer, self.fpath))
+
+        print(' {} items are to be gleaned from this CSV file: {} '.format(numer, self.fpath))
         return csvdocs
 
 
@@ -312,13 +312,20 @@ if __name__ == "__main__":
     dbmap = createdbnames()
     xmarks = CsvMapped(atlas=dbmap[u'import_headers'])
 
-    # create some 'databases' and 'collections' in the MongoClient
+    # check on existence of, create if required, and make backup copies of
+    # some 'databases' and 'collections' in the MongoClient
     client = MongoClient(dbserverip, dbserverport)
     currentdb = client.database_names()
+    # dbmap is the hard-coded idea of the structure returned by createdbnames()
     for dbnm, dbvals in dbmap.viewitems():
         if dbnm not in currentdb:
-            dbb = client[dbnm].create_collection(dbnm)
-            print "added", dbb, dbvals
+            dbb = client[dbnm]
+            col = dbb[dbvals]
+            print ("added database: {}    w/ collection:".format(dbb))
+            pprint(col)
+        else:
+            print("existing database: {}".format(dbnm))
+            print("with collections:  {}".format(client[dbnm].collection_names()))
     print("created / verified databases named: ")
     print(client.database_names())
 
@@ -348,7 +355,7 @@ if __name__ == "__main__":
             break
         if selnum != (len(new_fn_dd) - 1):  # ie, the last choice, - DONE -
             # open file, determine header
-            #  side effect: text body inside CsvMapped instance
+            # side effect: text body inside CsvMapped instance
             hdrstring, np = '', 0
             while not hdrstring:
                 # go find headerstring on top of selected file
@@ -376,45 +383,46 @@ if __name__ == "__main__":
             if csvdocs:
                 importedfn.update(hdrstring)
                 stuffdb.update(csvdocs)
-    # assign correct info to correct keys for insertion into current db collection
+        # assign correct info to correct keys for insertion into current db collection
         addlist = []
     """
-        for itemdd in csvdocs:
-            csvstuff = {}
-            # GWk come from manufacturer's csv-headers, dbv are in mongo database
-            for GWk, dbv in xmarks.atlas['GAWmap'].viewitems():
-                if GWk in itemdd:
-                    csvstuff[dbv] = itemdd[GWk]
-            addlist.append(csvstuff)
-        # also we want the best fit in case some CSVs share column names
-        # make report to get what we don't have
+for itemdd in csvdocs:
+csvstuff = {}
+# GWk come from manufacturer's csv-headers, dbv are in mongo database
+for GWk, dbv in xmarks.atlas['GAWmap'].viewitems():
+if GWk in itemdd:
+csvstuff[dbv] = itemdd[GWk]
+addlist.append(csvstuff)
+# also we want the best fit in case some CSVs share column names
+# make report to get what we don't have
 
-    # first fix formats and types to conform
-    ctr = 0
-    for item in addlist:
-        FOUND = False
-        try:
-            item[u'cost'] = int(item[u'cost'].replace('$', "").replace('.', "") or 0)
-            item[u'price'] = int(item[u'price'].replace('$', "").replace('.', "") or 0)
-            item[u'product_code'] = ('GAW ' + item[u'product_code']).strip()
-            #item[u'sku'] = int(item[u'sku'])
-        except ValueError as Ve:
-            print('*(* VALUE (*(*(*)*) ERRoR *)*)')
-            pprint(item)
-            pprint(Ve)
-        for olditem in stuffdb.find():
-            if item[u'sku'] in olditem.viewvalues():
-                print('BAR FOUND: {:8} {}'.format(item[u'product_code'], item[u'name']))
-                FOUND = True
-                break
-            elif item[u'product_code'] in olditem.viewvalues():
-                print('PCD FOUND: {:8} {}'.format(item[u'product_code'], item[u'name']))
-                FOUND = True
-                break
-        if not FOUND:
-            with open('/home/suber1/Desktop/order.txt', 'ab') as ofob:
-                ofob.write("{} - item: {:11} {:7} {} \n".format(ctr, item[u'sku'], item[u'price'], item[u'name']))
-    """
+# first fix formats and types to conform
+ctr = 0
+for item in addlist:
+FOUND = False
+try:
+item[u'cost'] = int(item[u'cost'].replace('$', "").replace('.', "") or 0)
+item[u'price'] = int(item[u'price'].replace('$', "").replace('.', "") or 0)
+item[u'product_code'] = ('GAW ' + item[u'product_code']).strip()
+#item[u'sku'] = int(item[u'sku'])
+except ValueError as Ve:
+print('*(* VALUE (*(*(*)*) ERRoR *)*)')
+pprint(item)
+pprint(Ve)
+for olditem in stuffdb.find():
+if item[u'sku'] in olditem.viewvalues():
+print('BAR FOUND: {:8} {}'.format(item[u'product_code'], item[u'name']))
+FOUND = True
+break
+elif item[u'product_code'] in olditem.viewvalues():
+print('PCD FOUND: {:8} {}'.format(item[u'product_code'], item[u'name']))
+FOUND = True
+break
+if not FOUND:
+with open('/home/suber1/Desktop/order.txt', 'ab') as ofob:
+ofob.write("{} - item: {:11} {:7} {} \n".format(ctr, item[u'sku'], item[u'price'], item[u'name']))
+"""
 
     print('Goodbye!')
     exit(0)
+
