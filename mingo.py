@@ -10,8 +10,8 @@ b) adjusting inventory count for an item to the given number
 c) adjusting inventory count +/- the given number
 d) compare the csv against the database & report the differences
 5) scrape / interact with alliance / southern hobby / games-workshop / wizards ordering system
-
 """
+
 from pymongo import MongoClient
 import os
 from pprint import pprint
