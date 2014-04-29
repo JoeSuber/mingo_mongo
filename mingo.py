@@ -3,12 +3,12 @@ __author__ = 'suber1'
 1) allow import of all csv-style data via user created templates
 2) templates are stored in database along with the data and a record of imported file-names
 3) templates can be found by a header-string that matches against the incoming header
-    if no match, user is prompted to provide the mapping of headers-to-db-collection-columns
+if no match, user is prompted to provide the mapping of headers-to-db-collection-columns
 4) need some way to classify the action to be taken on a csv file:
-    a) adding new items, including barcode, product code, description...
-    b) adjusting inventory count for an item to the given number
-    c) adjusting inventory count +/- the given number
-    d) compare the csv against the database & report the differences
+a) adding new items, including barcode, product code, description...
+b) adjusting inventory count for an item to the given number
+c) adjusting inventory count +/- the given number
+d) compare the csv against the database & report the differences
 5) scrape / interact with alliance / southern hobby / games-workshop / wizards ordering system
 
 """
@@ -20,9 +20,9 @@ import cPickle
 
 def selections(dd=None, prompt='Choose from above'):
     """
-    given dict of numbered options like {1: 'choose me', ...}
-    present user with options and return the chosen integer key and value string
-    """
+given dict of numbered options like {1: 'choose me', ...}
+present user with options and return the chosen integer key and value string
+"""
     choice = 1
     if not dd:
         print('selections: empty choice dictionary, returning 0')
@@ -32,7 +32,7 @@ def selections(dd=None, prompt='Choose from above'):
     q = 0
     while (q < 1) or (q > (choice + 1)):
         if len(dd) > 1:
-            q = int(str(raw_input(prompt)))
+            q = int(unicode(raw_input(prompt)))
         else:
             print('only one choice.. ')
             q = 1
@@ -41,8 +41,8 @@ def selections(dd=None, prompt='Choose from above'):
 
 def createdbnames(dbd=None):
     """
-    my pie-in-the-sky plans to automate all the drudge and operate using real data
-    """
+my pie-in-the-sky plans to automate all the drudge and operate using real data
+"""
     if not dbd:
         dbd = {u'manufacturer': [u'GAW', u'Games_Workshop', u'WIZ', u'Wizards_of_the_Coast', u'CHX', u'Chessex'],
                u'my_customers': [u'my_cust_id', u'email', u'requested_this', u'pre_paid_for', u'credit_file',
@@ -65,9 +65,9 @@ def createdbnames(dbd=None):
 
 def explore(done, client):
     """
-    Allow exploration of key:value storage in existing mongod instance
-    Also selects the database.collection to be used / toyed with.
-    """
+Allow exploration of key:value storage in existing mongod instance
+Also selects the database.collection to be used / toyed with.
+"""
     thestuffdb, primarydb = None, None
     usedb_name, collection_name = None, None
     while not done:
@@ -96,14 +96,14 @@ def explore(done, client):
 class CsvMapped(dict):
     """
     Presents persistent pairing (& pickling) of parsed CSV-parts to Mongodb
-    collection dicts.  Mappings can be defined here and also load, if available,
+    collection dicts. Mappings can be defined here and also load, if available,
     pickled mappings created earlier during interactive matching process. Goal is
     to map a csv-source file to database once & from that time forward, have
     similar documents automatically recognized, even if old database is unavailable.
     """
     def __init__(self, atlas={}, mapfile='pregen_csv_headers.pkl'):
         """
-        :type atlas: dict
+:       type atlas: dict
         """
         try:
             assert(isinstance(atlas, dict))
@@ -132,19 +132,14 @@ class CsvMapped(dict):
                         atlas = cPickle.load(mapfob)
                 except IOError:
                     print(" {} was given as a pickle-file for atlas-csv-header-maps, ".format(mapfile))
-                    print(" but it isn't a pickle.  Moving on...")
+                    print(" but it isn't a pickle. Moving on...")
         self.atlas = atlas
         self.pickle_fn = mapfile
         self.fpath = ''
         self.thetext = ''
         self.spltr = '|!'
-        self.defmark = '(@)'
-        #self.catlist = [u'date_added', u'description', u'price_we_sell', u'product_code',
-        #                u'manufacturer', u'barcode', u'we_buy_price', u'prefer_dist_list',
-        #                u'date_modified', u'_id', u'quant_pre_order', u'quant_want_min',
-        #                u'quant_want_max', u'quant_on_reorder', u'sku', u'alliance_sku',
-        #                u'southern_sku', u'we_buy_history', u'we_sell_history'
-        #                u'incremented_quant', u'decremented_quant', u'physical_count']
+        self.defmark = u'(@)'
+        self.startlooking = 'Desktop'
         self.catlist = createdbnames()[u'store_inventory']
 
     def fn_ctime(self, fn):
@@ -156,17 +151,18 @@ class CsvMapped(dict):
     def csvsources(self, usedcsvdb, startdir=None, looking_for='.csv'):
         """
         gather and track the input data (received via csv format) for
-         later import into the mongodb. Return only valid choices as dict.
+        later import into the mongodb. Return only valid choices as dict.
         """
+        if looking_for:
+            self.looking_for = looking_for
         if not startdir:
-            startdir = os.path.expanduser('~')
+            startdir = os.path.join(os.path.expanduser('~'), self.startlooking)
         print("started looking for {} from {}".format(looking_for, startdir))
+
         # paths to CSV files,
         csvfiles = [os.path.join(root, filename)
                     for root, dirnames, filenames in os.walk(startdir)
                     for filename in filenames if filename.endswith(looking_for)]
-        print('csvfiles from csvsources: ')
-        pprint(csvfiles)
         fn_dd = {ctr: fn for ctr, fn in enumerate(csvfiles)}
 
         # create unique key for filename to prevent re-import of the same data
@@ -180,7 +176,7 @@ class CsvMapped(dict):
         print('longfnkey.keys() =')
         pprint(examining)
         for checking in usedcsvdb.find():
-            # todo: don't forget to update database with filenames we use later!
+            # must find appropriate place to add the chosen filename to database
             if checking in examining:
                 deadnum = longfnkey[checking]
                 alreadyused.append(deadnum)
@@ -201,11 +197,12 @@ class CsvMapped(dict):
         with open(fpath, 'rU') as fob:
             self.thetext = fob.read().splitlines()
         self.fpath = fpath
-        return self.spltr.join([h.strip() for h in self.thetext[online].split(spliton)])
+        return self.spltr.join([h.strip().replace('.', '')
+                                for h in self.thetext[online].split(spliton)])
 
     def headers_to_mongo(self, db, hstrip):
         """
-        Interactively generates the map to be saved and referenced by the header-string.
+        Interactively generates the import-map to be saved and referenced by the header-string.
         """
         if hstrip in self.atlas.viewkeys():
             print("Already assigned: {} ".format(hstrip))
@@ -220,18 +217,18 @@ class CsvMapped(dict):
         genmap = {}
         total = len(hdrlist)
         for togo, (dbhdrkey, dbhdr) in enumerate(hdrlist.viewitems()):
-            print('...............................................')
+            print('.........................................................')
             print('of {} columns in csv-file, we still must assign {} a place'.format(total, total - togo))
             selnum, selcategory = selections(catchoice,
-                                             prompt='-HEADER MAPPING- Select Match for |{}| : '.format(dbhdr))
+                                             prompt='- HEADER MAP - Select Match for |{}| : '.format(dbhdr))
             if selcategory != ' - NOT USED - ':
                 if selcategory == ' - START OVER - ':
                     return self.headers_to_mongo(db, hstrip)
                 genmap[selcategory] = dbhdr
                 catchoice.pop(selnum)
-                # auto-done if only things left are  '- NO MATCH -', '- START OVER -', etc
+                # auto-done if only things left are '- NO MATCH -', '- START OVER -', etc
                 if len(catchoice) < catcutoff:
-                    print("We ran out of database categories before exhausting csv-columns")
+                    print("We ran out of database categories before exhausting {} columns".format(self.looking_for))
                     print("Now filling in defaults for remaining {} csv-columns...".format(total - togo))
                     for dbhdr in hdrlist.viewitems():
                         if dbhdr not in genmap:
@@ -240,14 +237,14 @@ class CsvMapped(dict):
             else:
                 # selcategory == ' - NOT USED - ', but we import anyway under csv-given column-name
                 genmap[dbhdr] = dbhdr
-                print("importing column '|{}|' as: |{}|".format(dbhdr, dbhdr))
+                print("importing {} column '|{}|' as: |{}|".format(selcategory, dbhdr, dbhdr))
 
-        # finish out map with user-defined uniform defaults
+        # finish out map with user-defined uniform default values
         if len(catchoice):
             for leftnum, leftover in catchoice.viewitems():
                 if leftnum < (len(catchoice) - catcutoff):
                     genmap[leftover] = self.defmark + unicode(raw_input(
-                        " ALL '{}' will map to : ".format(leftover))).decode()
+                        " ALL '{}' will have a value = : ".format(leftover))).decode()
 
         # assign just-generated header-map to the key=strung-together version of the csv-top-line
         self.atlas[hstrip] = genmap
@@ -256,6 +253,9 @@ class CsvMapped(dict):
         return genmap
 
     def ask_where_join(self, lpl):
+        """
+        The result of stray line-splitters in header-text-fields must be repaired
+        """
         qlpl = {num: pp for num, pp in enumerate(lpl)}
         pnum1, part1 = selections(qlpl, prompt='choose first part to join : ')
         pnum2, part2 = selections(qlpl, prompt='okay! now choose second part : ')
@@ -269,23 +269,34 @@ class CsvMapped(dict):
 
     def parsedata(self, headers, top_skip=0):
         """
-        the previously read file, a list of lines, is split out by comma, assigned to dict
+        the previously read file, a list of lines, is
+        commonly split out by comma or other delimiter, assigned to dict
         """
         extra_defs = []
+        try:
+            headers.pop(u'_id')
+        except Exception as e:
+            print("passed in headers probably lacked '_id' ")
+            print("but I let them in anyway... Error = {}".format(e))
         for val in headers.viewvalues():
-            if isinstance(val, (basestring, unicode)) and (self.defmark in val):
+            if isinstance(val, unicode) and (self.defmark in val):
                 val.replace(self.defmark, "")
                 if val == "":
                     pass
                 else:
                     extra_defs.append(val)
-                    print extra_defs, val
-        header_quant = len(headers) + len(extra_defs)
+                    print "parsedata says extra val is: ", val
+        header_quant = len(headers)
         numer = 0
         csvdocs = []
         for numer, csvline in enumerate(self.thetext):
-            if numer >= top_skip:       # skipping line zero as it should only be the headers
-                lineparts = csvline.split(',').extend(extra_defs)
+            # often skipping line zero as it should only be the headers
+            if numer >= top_skip:
+                lineparts = csvline.split(',')
+                #print ("lineparts: {}".format(lineparts))
+                #print ("extra_defs: {}".format(extra_defs))
+                lineparts.extend(extra_defs)
+                #print "lineparts after extend: ", lineparts
                 try:
                     assert(header_quant == len(lineparts))
                 except AssertionError:
@@ -299,9 +310,14 @@ class CsvMapped(dict):
                         print(' with either the import-map or the imported file.')
                         print(' Exiting now so you may fix the CSV file.')
                         exit(0)
-
+                except TypeError as te:
+                    print("ln: {} - {}".format(numer, csvline))
+                    print("{} ".format(te))
+                    print("skipped over the above line")
+                    continue
                 csvdocs.append({h: cell.strip() for h, cell in zip(headers.values(), lineparts)})
-        print('{} items are to be gleaned from this CSV file: {}'.format(numer, self.fpath))
+
+        print(' {} items are to be gleaned from this CSV file: {} '.format(numer, self.fpath))
         return csvdocs
 
 
@@ -312,13 +328,22 @@ if __name__ == "__main__":
     dbmap = createdbnames()
     xmarks = CsvMapped(atlas=dbmap[u'import_headers'])
 
-    # create some 'databases' and 'collections' in the MongoClient
+    # check on existence of, create if required, and make backup copies of
+    # some 'databases' and 'collections' in the MongoClient
     client = MongoClient(dbserverip, dbserverport)
     currentdb = client.database_names()
+    # dbmap is the hard-coded idea of the structure returned by createdbnames()
     for dbnm, dbvals in dbmap.viewitems():
-        if dbnm not in currentdb:
-            dbb = client[dbnm].create_collection(dbnm)
-            print "added", dbb, dbvals
+        dbb = client[dbnm]
+        if isinstance(dbvals, list):
+            col = dbb[{asis: "" for asis in dbvals}]
+        if isinstance(dbvals, dict):
+            col = dbb[{asis: sisa for asis, sisa in dbvals.viewitems()}]
+            print ("added database: {} w/ collection:".format(dbb))
+            pprint(col)
+        else:
+            print("existing database: {}".format(dbnm))
+            print("with collections: {}".format(client[dbnm].collection_names()))
     print("created / verified databases named: ")
     print(client.database_names())
 
@@ -346,9 +371,9 @@ if __name__ == "__main__":
         if fpath == " - NONE - ":
             print("All done!")
             break
-        if selnum != (len(new_fn_dd) - 1):  # ie, the last choice, - DONE -
+        if selnum != (len(new_fn_dd) - 1): # ie, the last choice, - DONE -
             # open file, determine header
-            #  side effect: text body inside CsvMapped instance
+            # side effect: text body inside CsvMapped instance
             hdrstring, np = '', 0
             while not hdrstring:
                 # go find headerstring on top of selected file
@@ -358,7 +383,7 @@ if __name__ == "__main__":
                     print("Breaking out due to a lot of blank lines instead of headers")
                     break
             print("Headline: #{:3} {}".format(np, hdrstring))
-            # look up header in database to find import map
+            # look up header in database home/suber1/Desktop/TradeRange010814.csvto find import map
             importmap = hdrs[hdrstring].find_one()
             print('importmap (keyed by: {}): '.format(hdrstring))
             pprint(importmap)
@@ -367,54 +392,67 @@ if __name__ == "__main__":
                 importmap = xmarks.headers_to_mongo(hdrs, hdrstring)
                 if importmap:
                     print('hdrstring: {}'.format(hdrstring))
-                    print('importmap: {}'.format(importmap))
+                    print('importmap ({} items):'.format(len(importmap)))
+                    pprint(importmap)
                     hdrs[hdrstring].insert(importmap)
                     # need to include some rules about adding, subtracting quantities
-            # using the import-map, import the csv data stored in the instance
+            # using the import-map, import to db the csv data stored in the instance
             csvdocs = xmarks.parsedata(importmap, top_skip=np)
-            # on success, add the input filename to database of imported_fn, re-run csv-sources
+            # on success, add the input filename to database of imported_fn
+            print("---------  Actions against CSV-import-lines  --------------------------")
+            actions = [u'Changing_Current_Inventory_Quantities', u'Just_New_Data_(avoid_changes)',
+                       u'Current_Price_Changes', u'Existing_Data_Changes_(not_quantities)',
+                       u'Skip_this_Import']
+            actiondd = {a: t for a, t in enumerate(actions)}
+            actnum, actiontype = selections(actiondd, prompt="Choose the type of action to use here: ")
             if csvdocs:
-                importedfn.update(hdrstring)
+                # record the usage of the csv-file in the database along with action taken
+                importedfn.insert({xmarks.fn_ctime(fpath): actiontype})
+                # init bulk ops to insert many lines
+                bulk = stuffdb.initialize_ordered_bulk_op()
+                for addline in csvdocs:
+                    bulk.find(addline[u'barcode'])
                 stuffdb.update(csvdocs)
-    # assign correct info to correct keys for insertion into current db collection
+        # assign correct info to correct keys for insertion into current db collection
         addlist = []
     """
-        for itemdd in csvdocs:
-            csvstuff = {}
-            # GWk come from manufacturer's csv-headers, dbv are in mongo database
-            for GWk, dbv in xmarks.atlas['GAWmap'].viewitems():
-                if GWk in itemdd:
-                    csvstuff[dbv] = itemdd[GWk]
-            addlist.append(csvstuff)
-        # also we want the best fit in case some CSVs share column names
-        # make report to get what we don't have
+for itemdd in csvdocs:
+csvstuff = {}
+# GWk come from manufacturer's csv-headers, dbv are in mongo database
+for GWk, dbv in xmarks.atlas['GAWmap'].viewitems():
+if GWk in itemdd:
+csvstuff[dbv] = itemdd[GWk]
+addlist.append(csvstuff)
+# also we want the best fit in case some CSVs share column names
+# make report to get what we don't have
 
-    # first fix formats and types to conform
-    ctr = 0
-    for item in addlist:
-        FOUND = False
-        try:
-            item[u'cost'] = int(item[u'cost'].replace('$', "").replace('.', "") or 0)
-            item[u'price'] = int(item[u'price'].replace('$', "").replace('.', "") or 0)
-            item[u'product_code'] = ('GAW ' + item[u'product_code']).strip()
-            #item[u'sku'] = int(item[u'sku'])
-        except ValueError as Ve:
-            print('*(* VALUE (*(*(*)*) ERRoR *)*)')
-            pprint(item)
-            pprint(Ve)
-        for olditem in stuffdb.find():
-            if item[u'sku'] in olditem.viewvalues():
-                print('BAR FOUND: {:8} {}'.format(item[u'product_code'], item[u'name']))
-                FOUND = True
-                break
-            elif item[u'product_code'] in olditem.viewvalues():
-                print('PCD FOUND: {:8} {}'.format(item[u'product_code'], item[u'name']))
-                FOUND = True
-                break
-        if not FOUND:
-            with open('/home/suber1/Desktop/order.txt', 'ab') as ofob:
-                ofob.write("{} - item: {:11} {:7} {} \n".format(ctr, item[u'sku'], item[u'price'], item[u'name']))
-    """
+# first fix formats and types to conform
+ctr = 0
+for item in addlist:
+FOUND = False
+try:
+item[u'cost'] = int(item[u'cost'].replace('$', "").replace('.', "") or 0)
+item[u'price'] = int(item[u'price'].replace('$', "").replace('.', "") or 0)
+item[u'product_code'] = ('GAW ' + item[u'product_code']).strip()
+#item[u'sku'] = int(item[u'sku'])
+except ValueError as Ve:
+print('*(* VALUE (*(*(*)*) ERRoR *)*)')
+pprint(item)
+pprint(Ve)
+for olditem in stuffdb.find():
+if item[u'sku'] in olditem.viewvalues():
+print('BAR FOUND: {:8} {}'.format(item[u'product_code'], item[u'name']))
+FOUND = True
+break
+elif item[u'product_code'] in olditem.viewvalues():
+print('PCD FOUND: {:8} {}'.format(item[u'product_code'], item[u'name']))
+FOUND = True
+break
+if not FOUND:
+with open('/home/suber1/Desktop/order.txt', 'ab') as ofob:
+ofob.write("{} - item: {:11} {:7} {} \n".format(ctr, item[u'sku'], item[u'price'], item[u'name']))
+"""
 
     print('Goodbye!')
     exit(0)
+
