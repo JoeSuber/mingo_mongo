@@ -32,7 +32,7 @@ def selections(dd=None, prompt='Choose from above'):
     q = 0
     while (q < 1) or (q > (choice + 1)):
         if len(dd) > 1:
-            q = int(str(raw_input(prompt)))
+            q = int(unicode(raw_input(prompt)))
         else:
             print('only one choice.. ')
             q = 1
@@ -139,6 +139,7 @@ class CsvMapped(dict):
         self.thetext = ''
         self.spltr = '|!'
         self.defmark = u'(@)'
+        self.startlooking = 'Desktop'
         #self.catlist = [u'date_added', u'description', u'price_we_sell', u'product_code',
         # u'manufacturer', u'barcode', u'we_buy_price', u'prefer_dist_list',
         # u'date_modified', u'_id', u'quant_pre_order', u'quant_want_min',
@@ -159,14 +160,13 @@ class CsvMapped(dict):
         later import into the mongodb. Return only valid choices as dict.
         """
         if not startdir:
-            startdir = os.path.expanduser('~')
+            startdir = os.path.join(os.path.expanduser('~'), self.startlooking)
         print("started looking for {} from {}".format(looking_for, startdir))
+
         # paths to CSV files,
         csvfiles = [os.path.join(root, filename)
                     for root, dirnames, filenames in os.walk(startdir)
                     for filename in filenames if filename.endswith(looking_for)]
-        print('csvfiles from csvsources: ')
-        pprint(csvfiles)
         fn_dd = {ctr: fn for ctr, fn in enumerate(csvfiles)}
 
         # create unique key for filename to prevent re-import of the same data
@@ -273,7 +273,7 @@ class CsvMapped(dict):
         """
         extra_defs = []
         for val in headers.viewvalues():
-            if self.defmark in val:
+            if isinstance(val, unicode) and (self.defmark in val):
                 val.replace(self.defmark, "")
                 if val == "":
                     pass
@@ -286,6 +286,7 @@ class CsvMapped(dict):
         for numer, csvline in enumerate(self.thetext):
             if numer >= top_skip:   # skipping line zero as it should only be the headers
                 lineparts = csvline.split(',').extend(extra_defs)
+                print "lineparts: ", lineparts
                 try:
                     assert(header_quant == len(lineparts))
                 except AssertionError:
@@ -299,6 +300,11 @@ class CsvMapped(dict):
                         print(' with either the import-map or the imported file.')
                         print(' Exiting now so you may fix the CSV file.')
                         exit(0)
+                except TypeError as te:
+                    print("ln: {} - {}".format(numer, csvline))
+                    print("{} ".format(te))
+                    print("skipped over the above line")
+                    continue
                 csvdocs.append({h: cell.strip() for h, cell in zip(headers.values(), lineparts)})
 
         print(' {} items are to be gleaned from this CSV file: {} '.format(numer, self.fpath))
@@ -365,7 +371,7 @@ if __name__ == "__main__":
                     print("Breaking out due to a lot of blank lines instead of headers")
                     break
             print("Headline: #{:3} {}".format(np, hdrstring))
-            # look up header in database to find import map
+            # look up header in database home/suber1/Desktop/TradeRange010814.csvto find import map
             importmap = hdrs[hdrstring].find_one()
             print('importmap (keyed by: {}): '.format(hdrstring))
             pprint(importmap)
@@ -374,7 +380,8 @@ if __name__ == "__main__":
                 importmap = xmarks.headers_to_mongo(hdrs, hdrstring)
                 if importmap:
                     print('hdrstring: {}'.format(hdrstring))
-                    print('importmap: {}'.format(importmap))
+                    print('importmap ({} items):'.format(len(importmap)))
+                    pprint(importmap)
                     hdrs[hdrstring].insert(importmap)
                     # need to include some rules about adding, subtracting quantities
             # using the import-map, import the csv data stored in the instance
