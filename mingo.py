@@ -272,6 +272,7 @@ class CsvMapped(dict):
         the previously read file, a list of lines, is split out by comma, assigned to dict
         """
         extra_defs = []
+        headers.pop(u'_id')
         for val in headers.viewvalues():
             if isinstance(val, unicode) and (self.defmark in val):
                 val.replace(self.defmark, "")
@@ -387,11 +388,14 @@ if __name__ == "__main__":
                     pprint(importmap)
                     hdrs[hdrstring].insert(importmap)
                     # need to include some rules about adding, subtracting quantities
-            # using the import-map, import the csv data stored in the instance
+            # using the import-map, import to db the csv data stored in the instance
             csvdocs = xmarks.parsedata(importmap, top_skip=np)
-            # on success, add the input filename to database of imported_fn, re-run csv-sources
+            # on success, add the input filename to database of imported_fn
             if csvdocs:
-                importedfn.update(hdrstring)
+                importedfn.insert(xmarks.fn_ctime(fpath))
+                bulk = stuffdb.initialize_ordered_bulk_op()
+                for adding in csvdocs:
+                    bulk.find(adding['barcode'])
                 stuffdb.update(csvdocs)
         # assign correct info to correct keys for insertion into current db collection
         addlist = []
