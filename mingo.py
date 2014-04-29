@@ -44,11 +44,11 @@ def createdbnames(dbd=None):
 my pie-in-the-sky plans to automate all the drudge and operate using real data
 """
     if not dbd:
-        dbd = {u'manufacturer': [u'GAW', u'Games_Workshop', u'WIZ', u'Wizards_of_the_Coast', u'CHX', u'Chessex'],
+        dbd = {u'manufacturer': {u'GAW': u'Games_Workshop', u'WIZ': u'Wizards_of_the_Coast', u'CHX': u'Chessex'},
                u'my_customers': [u'my_cust_id', u'email', u'requested_this', u'pre_paid_for', u'credit_file',
                                  u'face_rec', u'purchased', u'returned', u'ebay_notes', u'paid_on_invoice',
                                  u'shipped_out_date', u'ship_tracked', u'ship_rcvd', u'notes'],
-               u'my_interns': [u'contact', u'email', u'schedule_past', u'schedule_fut', u'good_things', u'bad_things'],
+               u'my_interns': [u'contact', u'email', u'schedule_past', u'schedule_future', u'good_things', u'bad_things'],
                u'item_sales_history': [u'we_sold_history', u'we_buy_history', u'receive_hist', u'cust_place_pre_order',
                                        u'cust_place_back_order', u'description', u'sku_for1' u'back_at_zero_dates'],
                u'store_inventory': [u'description', u'we_sell_price', u'multipack_sku',
@@ -150,7 +150,7 @@ class CsvMapped(dict):
 
     def csvsources(self, usedcsvdb, startdir=None, looking_for='.csv'):
         """
-        gather and track the input data (received via csv format) for
+        gather and track the input data (received via e.g. csv format) for
         later import into the mongodb. Return only valid choices as dict.
         """
         if looking_for:
@@ -333,17 +333,17 @@ if __name__ == "__main__":
     client = MongoClient(dbserverip, dbserverport)
     currentdb = client.database_names()
     # dbmap is the hard-coded idea of the structure returned by createdbnames()
+    col = ()
     for dbnm, dbvals in dbmap.viewitems():
         dbb = client[dbnm]
+        print "dbb= ", dbb
         if isinstance(dbvals, list):
-            col = dbb[{asis: "" for asis in dbvals}]
-        if isinstance(dbvals, dict):
-            col = dbb[{asis: sisa for asis, sisa in dbvals.viewitems()}]
-            print ("added database: {} w/ collection:".format(dbb))
-            pprint(col)
-        else:
-            print("existing database: {}".format(dbnm))
-            print("with collections: {}".format(client[dbnm].collection_names()))
+            col = dbb[dbnm].insert({asis: "" for asis in dbvals})
+            print "col from list= ", col
+        elif isinstance(dbvals, dict):
+            col = dbb[dbnm].insert(dbvals)
+        print ("added database: {} w/ collection:".format(dbb))
+        pprint(col)
     print("created / verified databases named: ")
     print(client.database_names())
 
