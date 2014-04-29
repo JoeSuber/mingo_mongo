@@ -260,7 +260,7 @@ class CsvMapped(dict):
         pnum1, part1 = selections(qlpl, prompt='choose first part to join : ')
         pnum2, part2 = selections(qlpl, prompt='okay! now choose second part : ')
         qlpl[pnum1] = part1 + part2
-        qlpl.pop(part2)
+        qlpl.pop(pnum2)
         opl = []
         for n in xrange(len(qlpl)+1):
             if n in qlpl:
