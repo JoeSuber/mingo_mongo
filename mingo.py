@@ -272,14 +272,12 @@ class CsvMapped(dict):
         """
         remove splitter from between quotes ONLY
         """
-        quotepos = [(p == '"') for p in line]
-        splitpos = [(q == self.comma) for q in line]
-        remover = False
-        for pos, (p, q) in enumerate(zip(quotepos, splitpos)):
-            if p:
-                remover = not remover
-            if remover and q:
-                line.replace(line[pos], " ")
+        if '"' in line:
+            h, q, t = line.partition('"')
+            if '"' in t:
+                h2, q, t2 = t.partition('"')
+                h2 = h2.replace(self.comma, " ")
+                return "".join([h, q, h2, q, t2])
         return line
 
     def parsedata(self, headers, top_skip=0):
@@ -308,7 +306,7 @@ class CsvMapped(dict):
             # often skipping line zero as it should be the header-line
             if numer >= top_skip:
                 csvline = self.decomma_quotes(csvline)
-                lineparts = csvline.split(',')
+                lineparts = csvline.split(self.comma)
                 #print ("lineparts: {}".format(lineparts))
                 #print ("extra_defs: {}".format(extra_defs))
                 lineparts.extend(extra_defs)
@@ -416,13 +414,13 @@ if __name__ == "__main__":
             # using the import-map, import to db the csv data stored in the instance
             csvdocs = xmarks.parsedata(importmap, top_skip=np)
             # on success, add the input filename to database of imported_fn
-            print("---------  Actions against CSV-import-lines  --------------------------")
-            actions = [u'Changing_Current_Inventory_Quantities', u'Just_New_Data_(avoid_changes)',
-                       u'Current_Price_Changes', u'Existing_Data_Changes_(not_quantities)',
-                       u'Skip_this_Import']
-            actiondd = {a: t for a, t in enumerate(actions)}
-            actnum, actiontype = selections(actiondd, prompt="Choose the type of action to use here: ")
             if csvdocs:
+                print("---------  Actions against CSV-import-lines  --------------------------")
+                actions = [u'Changing_Current_Inventory_Quantities', u'Just_New_Data_(avoid_changes)',
+                           u'Current_Price_Changes', u'Existing_Data_Changes_(not_quantities)',
+                           u'Skip_this_Import']
+                actiondd = {a: t for a, t in enumerate(actions)}
+                actnum, actiontype = selections(actiondd, prompt="Choose the type of action to use here: ")
                 # record the usage of the csv-file in the database along with action taken
                 importedfn.insert({xmarks.fn_ctime(fpath): actiontype})
                 # init bulk ops to insert many lines
