@@ -56,7 +56,7 @@ my pie-in-the-sky plans to automate all the drudge and operate using real data
                                     u'date_modified', u'quant_on_invoice', u'sku_for1', u'mfr_3letter', u'sku_alliance',
                                     u'sku_alt', u'increment_quant', u'decrement_quant', u'current_whole_quant',
                                     u'desired_quant', u'notes'],
-               u'stocking': [u'_id', u'description', u'we_bought_history', u'we_sold_history', u'date_added_toinv',
+               u'stocking': [u'description', u'we_bought_history', u'we_sold_history', u'date_added_toinv',
                              u'prefer_dist_list', u'quant_want_min', u'quant_want_max', u'quant_on_reorder',
                              u'dist_alerts', u'velocity'],
                u'import_headers': {u'gg|!hh|!ii|!': {u'gg': u'gogo', u'hh': u'hoho', u'ii': u'ioio'}, }, }
@@ -339,11 +339,12 @@ if __name__ == "__main__":
         print "dbb= ", dbb
         if isinstance(dbvals, list):
             col = dbb[dbnm].insert({asis: "" for asis in dbvals})
-            print "col from list= ", col
+            print "col from list= ", col, dbvals
         elif isinstance(dbvals, dict):
             col = dbb[dbnm].insert(dbvals)
+            print "col from dict= ", col, dbvals
         print ("added database: {} w/ collection:".format(dbb))
-        pprint(col)
+        pprint(dbvals)
     print("created / verified databases named: ")
     print(client.database_names())
 
