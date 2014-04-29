@@ -280,13 +280,16 @@ class CsvMapped(dict):
                 else:
                     extra_defs.append(val)
                     print "parsedata says extra val is: ", val
-        header_quant = len(headers) + len(extra_defs)
+        header_quant = len(headers)
         numer = 0
         csvdocs = []
         for numer, csvline in enumerate(self.thetext):
             if numer >= top_skip:   # skipping line zero as it should only be the headers
-                lineparts = csvline.split(',').extend(extra_defs)
-                print "lineparts: ", lineparts
+                lineparts = csvline.split(',')
+                #print ("lineparts: {}".format(lineparts))
+                #print ("extra_defs: {}".format(extra_defs))
+                lineparts.extend(extra_defs)
+                #print "lineparts after extend: ", lineparts
                 try:
                     assert(header_quant == len(lineparts))
                 except AssertionError:
