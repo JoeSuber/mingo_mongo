@@ -139,6 +139,7 @@ class CsvMapped(dict):
         self.thetext = ''
         self.spltr = '|!'
         self.defmark = u'(@)'
+        self.comma = ','
         self.startlooking = 'Desktop'
         self.catlist = createdbnames()[u'store_inventory']
 
@@ -189,7 +190,7 @@ class CsvMapped(dict):
         showfn_dd.update({len(fn_dd): ' - NONE - '})
         return showfn_dd
 
-    def construct_header(self, fpath, online=0, spliton=','):
+    def construct_header(self, fpath, online=0):
         """
         return strung-together representation of the column headers in a csv file
         side effect: load into instance the whole of the text-file as a list of lines
@@ -198,7 +199,7 @@ class CsvMapped(dict):
             self.thetext = fob.read().splitlines()
         self.fpath = fpath
         return self.spltr.join([h.strip().replace('.', '')
-                                for h in self.thetext[online].split(spliton)])
+                                for h in self.thetext[online].split(self.comma)])
 
     def headers_to_mongo(self, db, hstrip):
         """
@@ -267,6 +268,20 @@ class CsvMapped(dict):
                 opl.append(qlpl[n])
         return opl
 
+    def decomma_quotes(self, line):
+        """
+        remove splitter from between quotes ONLY
+        """
+        quotepos = [(p == '"') for p in line]
+        splitpos = [(q == self.comma) for q in line]
+        remover = False
+        for pos, (p, q) in enumerate(zip(quotepos, splitpos)):
+            if p:
+                remover = not remover
+            if remover and q:
+                line.replace(line[pos], " ")
+        return line
+
     def parsedata(self, headers, top_skip=0):
         """
         the previously read file, a list of lines, is
@@ -277,7 +292,7 @@ class CsvMapped(dict):
             headers.pop(u'_id')
         except Exception as e:
             print("passed in headers probably lacked '_id' ")
-            print("but I let them in anyway... Error = {}".format(e))
+            print("but they were cute so I let them in anyway... Error = {}".format(e))
         for val in headers.viewvalues():
             if isinstance(val, unicode) and (self.defmark in val):
                 val.replace(self.defmark, "")
@@ -290,8 +305,9 @@ class CsvMapped(dict):
         numer = 0
         csvdocs = []
         for numer, csvline in enumerate(self.thetext):
-            # often skipping line zero as it should only be the headers
+            # often skipping line zero as it should be the header-line
             if numer >= top_skip:
+                csvline = self.decomma_quotes(csvline)
                 lineparts = csvline.split(',')
                 #print ("lineparts: {}".format(lineparts))
                 #print ("extra_defs: {}".format(extra_defs))
