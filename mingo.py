@@ -428,7 +428,7 @@ if __name__ == "__main__":
                 actnum, actiontype = selections(actiondd, prompt="Choose the type of action to use on the data: ")
 
                 # divide items that are in database, items out
-
+                
                 # init bulk ops to insert many lines
                 bulk = stuffdb.initialize_unordered_bulk_op()
                 if actiontype == u'Add/Subtract_Current_Quantities':
