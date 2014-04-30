@@ -13,6 +13,7 @@ d) compare the csv against the database & report the differences
 """
 
 from pymongo import MongoClient
+from pymongo.errors import BulkWriteError
 import os
 from pprint import pprint
 import cPickle
@@ -255,7 +256,8 @@ class CsvMapped(dict):
 
     def ask_where_join(self, lpl):
         """
-        The result of stray line-splitters in header-text-fields must be repaired
+        The unfortunate result of stray line-splitters surrounded by extra
+        quote delimiters in header-text-fields must be repaired
         """
         qlpl = {num: pp for num, pp in enumerate(lpl)}
         pnum1, part1 = selections(qlpl, prompt='choose first part to join : ')
@@ -357,7 +359,7 @@ if __name__ == "__main__":
         elif isinstance(dbvals, dict):
             col = dbb[dbnm].insert(dbvals)
             print "col from dict= ", col, dbvals
-        print ("added database: {} w/ collection:".format(dbb))
+        print("added database: {} w/ collection:".format(dbb))
         pprint(dbvals)
     print("created / verified databases named: ")
     print(client.database_names())
@@ -386,7 +388,7 @@ if __name__ == "__main__":
         if fpath == " - NONE - ":
             print("All done!")
             break
-        if selnum != (len(new_fn_dd) - 1): # ie, the last choice, - DONE -
+        if selnum != (len(new_fn_dd) - 1):  # ie, the last choice, - DONE -
             # open file, determine header
             # side effect: text body inside CsvMapped instance
             hdrstring, np = '', 0
@@ -397,37 +399,57 @@ if __name__ == "__main__":
                 if np > 60:
                     print("Breaking out due to a lot of blank lines instead of headers")
                     break
-            print("Headline: #{:3} {}".format(np, hdrstring))
-            # look up header in database home/suber1/Desktop/TradeRange010814.csvto find import map
-            importmap = hdrs[hdrstring].find_one()
-            print('importmap (keyed by: {}): '.format(hdrstring))
+
+            # look up header in database find import map
+            importmap = hdrs.find_one(hdrstring)
+            print('importmap? (keyed by line #{}: {}): '.format(np, hdrstring))
             pprint(importmap)
             # if no import-map, create the import-map:
             if not importmap:
+                print("...creating import map ")
                 importmap = xmarks.headers_to_mongo(hdrs, hdrstring)
                 if importmap:
                     print('hdrstring: {}'.format(hdrstring))
                     print('importmap ({} items):'.format(len(importmap)))
                     pprint(importmap)
-                    hdrs[hdrstring].insert(importmap)
+                    hdrs.insert({hdrstring: importmap})
                     # need to include some rules about adding, subtracting quantities
             # using the import-map, import to db the csv data stored in the instance
             csvdocs = xmarks.parsedata(importmap, top_skip=np)
             # on success, add the input filename to database of imported_fn
             if csvdocs:
                 print("---------  Actions against CSV-import-lines  --------------------------")
-                actions = [u'Changing_Current_Inventory_Quantities', u'Just_New_Data_(avoid_changes)',
-                           u'Current_Price_Changes', u'Existing_Data_Changes_(not_quantities)',
+                actions = [u'Add/Subtract_Current_Quantities',
+                           u'New_Data_Bulk_Insert',
+                           u'Current_Price_Changes',
+                           u'Update_and_Add_Data_(not_quantities)',
                            u'Skip_this_Import']
                 actiondd = {a: t for a, t in enumerate(actions)}
-                actnum, actiontype = selections(actiondd, prompt="Choose the type of action to use here: ")
-                # record the usage of the csv-file in the database along with action taken
-                importedfn.insert({xmarks.fn_ctime(fpath): actiontype})
+                actnum, actiontype = selections(actiondd, prompt="Choose the type of action to use on the data: ")
+
+                # divide items that are in database, items out
+
                 # init bulk ops to insert many lines
-                bulk = stuffdb.initialize_ordered_bulk_op()
-                for addline in csvdocs:
-                    bulk.find(addline[u'barcode'])
-                stuffdb.update(csvdocs)
+                bulk = stuffdb.initialize_unordered_bulk_op()
+                if actiontype == u'Add/Subtract_Current_Quantities':
+                    for addline in csvdocs:
+                        if u'barcode' in importmap:
+                            bulk.find(addline[u'barcode'])
+
+                WORKING = True
+                while WORKING:
+                    try:
+                        bulk.execute()
+                        WORKING = False
+                    except BulkWriteError as bwe:
+                        WORKING = True
+                        pprint(bwe.details)
+
+
+
+
+            # record the usage of the csv-file in the database along with action taken
+            importedfn.insert({xmarks.fn_ctime(fpath): actiontype})
         # assign correct info to correct keys for insertion into current db collection
         addlist = []
     """
