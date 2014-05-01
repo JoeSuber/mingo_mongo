@@ -71,7 +71,7 @@ def createdbnames(dbd=None):
     if not dbd:
         dbd = {u'manufacturer': {u'3letter_code': u'GAW',  u'Full_Name': u'Games_Workshop', u'Contact_Phone': u'',
                                  u'Contact_email': u'', u'Contact_Web': u'',
-                                 u'Sales_Rep': u'Ben Cumming', u'My_Account': int},
+                                 u'Sales_Rep': u'Ben Cumming', u'My_Account': 0},
                u'my_customers': [u'my_cust_id', u'email', u'requested_this', u'pre_paid_for', u'credit_file',
                                  u'face_rec', u'purchased', u'returned', u'ebay_notes', u'paid_on_invoice',
                                  u'shipped_out_date', u'ship_tracked', u'ship_rcvd', u'notes'],
@@ -85,7 +85,7 @@ def createdbnames(dbd=None):
                              u'we_sold_history', u'date_added_toinv', u'prefer_dist_list', u'quant_want_min',
                              u'quant_want_max', u'quant_on_reorder', u'dist_alerts', u'velocity'],
                u'import_headers': {u'hdrhash': u'hdr1|!hdr2|!hdr3', u'hdr1': u'gogo', u'hdr2': u'hoho',
-                                   u'hdr3': u'ioio', u'instructions': dict},
+                                   u'hdr3': u'ioio', u'instructions': {}},
                u'default_keys': {u'manufacturer': [u'3letter_code'], u'my_customers': [u'my_cust_id', u'email'],
                                  u'my_interns': [u'email'], u'store_inventory': [u'sku_for1', u'barcode', u'sku_alt'],
                                  u'stocking': [u'string_id']},
