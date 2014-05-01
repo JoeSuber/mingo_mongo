@@ -114,11 +114,13 @@ def explore(done, client):
         key, usedb_name = selections(clientnames, prompt='Choose the number of mongo db to be explored: ')
         print('okay - choice was {:3} - {} \n'.format(key+1, usedb_name))
         if not usedb_name:
-            usedb_name = "31cent"
+            usedb_name = u"31cent"
         primarydb = client[usedb_name]
         primaries = {num: unicode(pri) for num, pri in enumerate(primarydb.collection_names())}
         key, collection_name = selections(primaries, prompt='Choose the collection within {} to explore: '.format(usedb_name))
         print('okay - choice was {:3} - {} \n'.format(key+1, collection_name))
+        if not collection_name:
+            collection_name = u"fake"
         thestuffdb = primarydb[collection_name]
         print("This collection contains {} items ".format(thestuffdb.count()))
         end_dd = {0: ' done exploring - move on to import, etc',
