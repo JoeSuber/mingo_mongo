@@ -50,7 +50,7 @@ def selections(dd=None, prompt='Choose from above'):
     choice = 1
     if not dd:
         print('selections: empty choice dictionary, returning 0')
-        return 0, '- EMPTY -'
+        return 0, None
     for choice, dbnm in dd.viewitems():
         print('{:4}- {}'.format(choice + 1, dbnm))
     q = 0
@@ -113,6 +113,8 @@ def explore(done, client):
         clientnames = {num: clnm for num, clnm in enumerate(client.database_names())}
         key, usedb_name = selections(clientnames, prompt='Choose the number of mongo db to be explored: ')
         print('okay - choice was {:3} - {} \n'.format(key+1, usedb_name))
+        if not usedb_name:
+            usedb_name = "31cent"
         primarydb = client[usedb_name]
         primaries = {num: unicode(pri) for num, pri in enumerate(primarydb.collection_names())}
         key, collection_name = selections(primaries, prompt='Choose the collection within {} to explore: '.format(usedb_name))
@@ -351,7 +353,7 @@ if __name__ == "__main__":
     dbserverip = 'localhost'
     dbserverport = 27017
     dbmap = createdbnames()
-    xmarks = CsvMapped(atlas=dbmap[u'import_headers'])
+    xmarks = CsvMapped()
     # max_np is the number of 'readline()' lines to scan before giving up
     max_np = 10
     # check on existence of, create if required, and make backup copies of
