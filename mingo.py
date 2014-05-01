@@ -297,12 +297,13 @@ class CsvMapped(dict):
 
     def parsedata(self, headers, top_skip=0):
         """
-        the previously read file, a list of lines, is
+        the previously read file is a list of lines. The lines are
         commonly split out by comma or other delimiter, assigned to dict
         """
         extra_defs = []
         try:
-            headers.pop(u'_id')
+            permits = headers.pop(u'_id')
+            instructables = headers.pop(u'instructions')
         except Exception as e:
             print("passed in headers probably lacked '_id' ")
             print("but they were cute so I let them in anyway... Error = {}".format(e))
@@ -361,7 +362,6 @@ if __name__ == "__main__":
     # check on existence of, create if required, and make backup copies of
     # some 'databases' and 'collections' in the MongoClient
     client = MongoClient(dbserverip, dbserverport)
-    overalldb, stuffdb = explore(0, client)
     currentdb = client.database_names()
     # dbmap is the hard-coded idea of the structure returned by createdbnames()
     col = ()
@@ -459,8 +459,8 @@ if __name__ == "__main__":
                 # divide items that are in database, items out
 
                 # init bulk ops to insert many lines
-                bulk = stuffdb.initialize_unordered_bulk_op()
-                if actiontype == u'Add/Subtract_Current_Quantities':
+                bulk = overalldb.initialize_unordered_bulk_op()
+                if actiontype == u'New_Data_Bulk_Insert':
                     for addline in csvdocs:
                         if u'barcode' in importmap:
                             bulk.find(addline[u'barcode'])
