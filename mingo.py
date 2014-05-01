@@ -89,7 +89,7 @@ def createdbnames(dbd=None):
                u'default_keys': {u'manufacturer': [u'3letter_code'], u'my_customers': [u'my_cust_id', u'email'],
                                  u'my_interns': [u'email'], u'store_inventory': [u'sku_for1', u'barcode', u'sku_alt'],
                                  u'stocking': [u'string_id']},
-               u'commandd': {u'$': u'Column is in currency with decimal - Convert to Cents',
+               u'commandd': {u'CUR': u'Column is in currency with decimal - Convert to Cents',
                              u'CENT': u"Convert & Treat value like whole Cents",
                              u'NUMB': u"Turn Number-Strings into counting Integers",
                              u"NEW": u"Import Only if New or Blank in Existing Data",
