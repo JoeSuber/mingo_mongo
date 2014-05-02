@@ -14,6 +14,7 @@ d) compare the csv against the database & report the differences
 
 from pymongo import MongoClient
 #from pymongo.errors import BulkWriteError
+from pymongo.errors import DuplicateKeyError
 from pymongo import ASCENDING, DESCENDING
 import os
 from pprint import pprint
@@ -84,12 +85,21 @@ def createdbnames(dbd=None):
                u'stocking': [u'string_id', u'description', u'we_bought_history',
                              u'we_sold_history', u'date_added_toinv', u'prefer_dist_list', u'quant_want_min',
                              u'quant_want_max', u'quant_on_reorder', u'dist_alerts', u'velocity'],
-               u'import_headers': {u'hdrhash': u'hdr1|!hdr2|!hdr3', u'hdr1': u'gogo', u'hdr2': u'hoho',
-                                   u'hdr3': u'ioio', u'instructions': {}},
-               u'default_keys': {u'manufacturer': [u'3letter_code'], u'my_customers': [u'my_cust_id', u'email'],
-                                 u'my_interns': [u'email'], u'store_inventory': [u'sku_for1', u'barcode', u'sku_alt'],
-                                 u'stocking': [u'string_id']},
-               u'import_directions': {u'mapstring': u""},
+               u'index_keys': {u'manufacturer': [(u'3letter_code', 1)],
+                               u'my_customers': [(u'my_cust_id', 1), (u'email', 1)],
+                               u'my_interns': [(u'email', 1)],
+                               u'store_inventory': [(u'sku_for1', 1), (u'barcode', 1), (u'sku_alt', 1)],
+                               u'stocking': [(u'string_id', 1)],
+                               u'import_directions': [(u'filepath', 1)],
+                               u'index_keys': [(u'index_keys', 1)],
+                               u'commandd': [(u'CUR', 1)]},
+               u'import_directions': {u'headline': u'this|!is_not|!a_real|!header|!string',
+                                      u'filepath': u'/some/once/valid/file_path.csv|23423234.23',
+                                      u'special_commands': u'0,NUMB,3,NO',
+                                      u'csv_to_db': {u'this': u'barcode',
+                                                     u'is_not': u'description',
+                                                     u'a_real': u'quant_on_invoice',
+                                                     u'string': u'we_sell_price'}},
                u'commandd': {u'CUR': u'Column is in currency with decimal - Convert to Cents - (Implies NUMB)',
                              u'NUMB': u"Number-Strings into Integers (leave off decimal point)",
                              u"NEW": u"Import Only if New or Blank in Existing Data",
@@ -100,11 +110,17 @@ def createdbnames(dbd=None):
                }
         return dbd
 
-def de_stringer(st, i):
-    if i == u"CUR":
-        return int(st.strip().replace('$', '').replace('.', ''))
-    elif i == u"NUMB":
-        return int(st.strip().replace('$', '').split('.', '')[0])
+def de_string(i, isint=True):
+    """ if getting a string, return pennies on the dollar, or stripped-down string"""
+    if isinstance(i, (str, unicode)):
+        try:
+            if isint:
+                return int(i.replace(".", "").replace("$", "").strip())
+            else:
+                return float(i.replace("$", "").strip())
+        except ValueError:
+            return i.strip()
+    return i
 
 def explore(done, client):
     """
@@ -197,8 +213,8 @@ class CsvMapped(dict):
         for checking in usedcsvdb.find():
             print("DEBUG (should be string) 'checking' = {}".format(checking))
             # must find appropriate place to add the chosen filename to database
-            if checking[u'fn'] in examining:
-                deadnum = longfnkey[checking]
+            if checking[u'filepath'] in examining:
+                deadnum = longfnkey[checking[u'filepath']]
                 alreadyused.append(deadnum)
                 print('{:4} Already Imported: {}'.format(deadnum, fn_dd.pop(deadnum)))
         print("There are {} files with extension {} we have already imported into database"
@@ -230,18 +246,20 @@ class CsvMapped(dict):
             # enumerated list of possible fields defaults to inventory style header-choices
             catchoice = {kk: vv for kk, vv in enumerate(self.catlist)}
         # enumerated list of column headers
-        hdrlist = {kk: vv for kk, vv in enumerate(hstrip.split(self.spltr))}
+        hdrlist = {kk: vv.strip() for kk, vv in enumerate(hstrip.split(self.spltr))}
         catstart = len(catchoice)
         catchoice.update({len(catchoice): ' - NOT USED - ', len(catchoice)+1: ' - START OVER - '})
         pprint(catchoice)
         catcutoff = len(catchoice) - catstart
         genmap = {}
+        hdr_key_list = []
         total = len(hdrlist)
         for togo, (dbhdrkey, dbhdr) in enumerate(hdrlist.viewitems()):
             print('.............  {} .........................................'.format(total - togo))
             print('of {} columns in csv-file, we still must assign {} a place'.format(total, total - togo))
             selnum, selcategory = selections(catchoice,
                                              prompt='- HEADER MAP - Select Match for |{}| : '.format(dbhdr))
+            print('Your Choice: #{} - {}'.format(selnum, selcategory))
             if selcategory != ' - NOT USED - ':
                 if selcategory == ' - START OVER - ':
                     return self.headers_to_mongo(db, hstrip)
@@ -316,7 +334,6 @@ class CsvMapped(dict):
         except Exception as e:
             print("passed in headers probably lacked '_id' ")
             print("but they were cute so I let them in anyway... Error = {}".format(e))
-
         # set up the values that are defaults for every line
         for val in headers.viewvalues():
             if isinstance(val, unicode) and (self.defmark in val):
@@ -378,43 +395,48 @@ if __name__ == "__main__":
     #dbserverip = '192.168.0.105'
     dbserverip = 'localhost'
     dbserverport = 27017
-    dbmap = createdbnames()
     xmarks = CsvMapped()
     # max_np is the number of 'readline()' lines to scan before giving up
     max_np = 10
-    # check on existence of, create if required, and make backup copies of
     # some 'databases' and 'collections' in the MongoClient
     client = MongoClient(dbserverip, dbserverport)
-    currentdb = client.database_names()
-    # dbmap is the hard-coded idea of the structure returned by createdbnames()
+    #currentdb = client.database_names()
+    currentdbchoices = {num: dbname for num, dbname in enumerate(client.database_names())}
+    currentdbchoices.update({len(currentdbchoices): 'Name A New Main Database'})
+    _, choice = selections(currentdbchoices, prompt="Select :")
+    while (choice == 'Name A New Main Database') or (choice is None):
+        choice = unicode(raw_input(u"Type in the new Database name :"))
+        if (u"." in choice) or (u"'" in choice) or (u"\\" in choice) or (u'"' in choice):
+            print(u"Don't use those funny characters \n  Try Again \n")
+            choice = None
+
+    # dbmap is the hard-coded preliminary idea of the db structure as a dict
+    dbmap = createdbnames()
     col = ()
-    dbb = client[u'31cent']
+    dbb = client[choice]
     for dbnm, dbvals in dbmap.viewitems():
-        # print "dbb= ", dbb
+        try:
+            dbb[dbnm].create_index(dbmap[u'index_keys'][dbnm], unique=True, dropDups=True)
+        except DuplicateKeyError, ValueError:
+            print("no indexing could be completed on {}".format(dbnm))
         if isinstance(dbvals, list):
-            col = dbb[dbnm].update({asis: "" for asis in dbvals}, {asis: "" for asis in dbvals}, upsert=True)
-            if col:
-                print("LLL col {} from list= {}".format(col, dbvals))
-            else:
-                print("LLL dbnm = {}  already exists...".format(dbnm))
-        elif isinstance(dbvals, dict):
-            col = dbb[dbnm].update(dbvals, dbvals, upsert=True)
-            if col:
-                print("DDD added col from dict= {}".format(dbvals))
-            else:
-                print("DDD dbnm = {}  already exists...".format(dbnm))
-        print("added database: {} w/ collection:".format(dbb[dbnm]))
-        pprint(dbvals)
+            dbvals = {asis: "" for asis in dbvals}
+        try:
+            col = dbb[dbnm].insert(dbvals)
+        except DuplicateKeyError:
+            print("No Duplication allowed for {}".format(dbvals))
+        print("attempted adding a collection like: {} ".format(dbb[dbnm]))
+        print("it contains:")
+        pprint([item for item in dbb[dbnm].find()])
     print("created / verified databases named: ")
     print(client.database_names())
 
     # user chooses the database and collection we are messing with:
     overalldb, stuffdb = explore(0, client)
 
-    # previously found mappings between CSV and DB columns:
-    hdrs = stuffdb[u'import_headers']
-    directions = stuffdb[u'import_directions']
-    importedfn = stuffdb[u'imported_flnms']
+    # some collections to load up:
+    hdrs = stuffdb[u'import_directions']
+
 
     # find database collection labels for 'explored' stuffdb
     labelset = set()
@@ -424,7 +446,7 @@ if __name__ == "__main__":
     pprint(labelset)
 
     # validate found source files for potential input into db
-    new_fn_dd = xmarks.csvsources(importedfn, startdir=None, looking_for='.csv')
+    new_fn_dd = xmarks.csvsources(hdrs, startdir=None, looking_for='.csv')
 
     # now have user choose one source-file until none left or done:
     selnum = 0
@@ -450,12 +472,9 @@ if __name__ == "__main__":
             print("Looking in {}".format(hdrs))
             print("for previous imports using: ")
             print("'{}'\n".format(hdrstring))
-            importmap = hdrs.find_one({u'hdrhash': hdrstring})
-            importdirections = directions.find_one({u'mapstring': hdrstring})
+            importmap = hdrs.find_one({u'headline': hdrstring})[u'csv_to_db']
             print('importmap? (keyed by line #{}: {}): '.format(np, hdrstring))
             pprint(importmap)
-            print(" ... with directions:")
-            pprint(importdirections)
             if importmap:
                 print("^^^^^^^^^^^ total: {} columns ^^^^^^^^^^^".format(len(importmap)))
                 yesno = {0: "Use this map & directions to import the file to database",
@@ -463,8 +482,7 @@ if __name__ == "__main__":
                 selnum, _ = selections(yesno, prompt="Select : ")
                 print(" your choice: {}".format(yesno[selnum]))
                 if selnum:
-                    hdrs.remove({u'hdrhash': hdrstring})
-                    directions.remove({u'mapstring': hdrstring})
+                    hdrs.remove({u'headline': hdrstring})
                     importmap = None
                     importdirections = None
 
@@ -483,12 +501,11 @@ if __name__ == "__main__":
 
             if csvdocs:
                 # on success, add the input filename to database of imported_fn
-                importedfn.update({u'fn': xmarks.fn_ctime(fpath)})
+                hdrs.update({u'filepath': xmarks.fn_ctime(fpath)})
                 # save the new map in database because it has succeeded in making a csvdoc
-                importdirections.update({u'mapstring': hdrstring})
-                importmap.update({u'hdrhash': hdrstring})
+                importmap.update({u'headline': hdrstring})
                 hdrs.insert(importmap)
-                directions.insert(importdirections)
+
 
                 print("---------  Actions against CSV-import-lines  --------------------------")
                 actions = [u'Add/Subtract_Current_Quantities',
