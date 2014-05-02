@@ -89,18 +89,22 @@ def createdbnames(dbd=None):
                u'default_keys': {u'manufacturer': [u'3letter_code'], u'my_customers': [u'my_cust_id', u'email'],
                                  u'my_interns': [u'email'], u'store_inventory': [u'sku_for1', u'barcode', u'sku_alt'],
                                  u'stocking': [u'string_id']},
-               u'commandd': {u'CUR': u'Column is in currency with decimal - Convert to Cents',
-                             u'CENT': u"Convert & Treat value like whole Cents",
-                             u'NUMB': u"Turn Number-Strings into counting Integers",
+               u'import_directions': {u'mapstring': u""},
+               u'commandd': {u'CUR': u'Column is in currency with decimal - Convert to Cents - (Implies NUMB)',
+                             u'NUMB': u"Number-Strings into Integers (leave off decimal point)",
                              u"NEW": u"Import Only if New or Blank in Existing Data",
-                             u"REPLACE": u"Remove Existing Items that Have this Key ",
+                             u"REPLACE": u"Remove Existing Items that Have this Key (implies KEY)",
                              u"KEY": u"This Column Holds a 'Key' Lookup Value ",
                              u"ADD": u"Increment or Decrement (an existing Integer value) by This Much",
                              u"NO": u"Don't Use This Imported Column to Change Anything"}
                }
         return dbd
 
-
+def de_stringer(st, i):
+    if i == u"CUR":
+        return int(st.strip().replace('$', '').replace('.', ''))
+    elif i == u"NUMB":
+        return int(st.strip().replace('$', '').split('.', '')[0])
 
 def explore(done, client):
     """
@@ -141,11 +145,11 @@ def explore(done, client):
 
 class CsvMapped(dict):
     """
-    Presents persistent pairing of parsed page parts particularly to Mongodb
+    Provides persistent pairing of parsed page parts particularly to Mongodb
     collection dicts. Mappings can be defined here and also load, if available,
     mappings created earlier during interactive matching process. Goal is
     to map a csv-source file to database once & from that time forward, have
-    similar documents automatically recognized, even if old database is unavailable.
+    similarly headed documents automatically recognized & imported.
     """
     def __init__(self, startlooking='Desktop', cmd=u'commandd'):
         self.fpath = ''
@@ -191,8 +195,9 @@ class CsvMapped(dict):
         print('longfnkey.keys() =')
         pprint(examining)
         for checking in usedcsvdb.find():
+            print("DEBUG (should be string) 'checking' = {}".format(checking))
             # must find appropriate place to add the chosen filename to database
-            if checking in examining:
+            if checking[u'fn'] in examining:
                 deadnum = longfnkey[checking]
                 alreadyused.append(deadnum)
                 print('{:4} Already Imported: {}'.format(deadnum, fn_dd.pop(deadnum)))
@@ -218,11 +223,13 @@ class CsvMapped(dict):
 
     def headers_to_mongo(self, db, hstrip, catchoice=None):
         """
-        Interactively generates the import-map to be saved and referenced by the header-string.
+        Interactively generates the import-map and special instructions
+        to be saved and later referenced by the header-string.
         """
         if not catchoice:
-            # defaults to inventory style header-choices
+            # enumerated list of possible fields defaults to inventory style header-choices
             catchoice = {kk: vv for kk, vv in enumerate(self.catlist)}
+        # enumerated list of column headers
         hdrlist = {kk: vv for kk, vv in enumerate(hstrip.split(self.spltr))}
         catstart = len(catchoice)
         catchoice.update({len(catchoice): ' - NOT USED - ', len(catchoice)+1: ' - START OVER - '})
@@ -253,7 +260,7 @@ class CsvMapped(dict):
                 genmap[dbhdr] = dbhdr
                 print("importing {} column '|{}|' as: |{}|".format(selcategory, dbhdr, dbhdr))
 
-        # finish out map with user-defined uniform default values for blanks
+        # finish out map with optional user-defined uniform default values for blanks in column
         if len(catchoice):
             print(" Press <Enter> for each header if you wish its values to default to 'None'")
             for leftnum, leftover in catchoice.viewitems():
@@ -262,14 +269,14 @@ class CsvMapped(dict):
                         " ALL '{}' will have a value = : ".format(leftover))).decode()
 
         pprint(createdbnames()[self.cmd])
-        genmap[u'instructions'] = {colname: unicode(raw_input("special instructions (comma separated) for |{}| : "
-                                                              .format(colname)))
-                                   for colname in genmap.keys()}
-        return genmap
+        #pprint(genmap)
+        instructions = {colname: unicode(raw_input("special instructions (comma separated) for |{}| : "
+                                                   .format(colname))) for colname in genmap.keys()}
+        return genmap, instructions
 
     def ask_where_join(self, lpl):
         """
-        The unfortunate result of stray line-splitters surrounded by extra
+        The rare and unfortunate result of stray line-splitters surrounded by extra
         quote delimiters in header-text-fields must be repaired
         """
         qlpl = {num: pp for num, pp in enumerate(lpl)}
@@ -287,6 +294,8 @@ class CsvMapped(dict):
         """
         remove splitter from between quotes ONLY
         """
+        # get rid of double-quotes entirely
+        line = line.replace('""', '')
         if '"' in line:
             h, q, t = line.partition('"')
             if '"' in t:
@@ -295,18 +304,20 @@ class CsvMapped(dict):
                 return "".join([h, q, h2, q, t2])
         return line
 
-    def parsedata(self, headers, top_skip=0):
+    def parsedata(self, headers, directions, top_skip=0):
         """
-        the previously read file is a list of lines. The lines are
-        commonly split out by comma or other delimiter, assigned to dict
+        the previously read file is a list of lines stored in the instance. The lines
+        are commonly split out by comma or other delimiter, then assigned to dict
         """
         extra_defs = []
         try:
             permits = headers.pop(u'_id')
-            instructables = headers.pop(u'instructions')
+            instructions = headers.pop(u'hdrhash')
         except Exception as e:
             print("passed in headers probably lacked '_id' ")
             print("but they were cute so I let them in anyway... Error = {}".format(e))
+
+        # set up the values that are defaults for every line
         for val in headers.viewvalues():
             if isinstance(val, unicode) and (self.defmark in val):
                 val.replace(self.defmark, "")
@@ -314,7 +325,8 @@ class CsvMapped(dict):
                     pass
                 else:
                     extra_defs.append(val)
-                    print "parsedata says extra val is: ", val
+                    #print "parsedata says extra val is: ", val
+
         header_quant = len(headers)
         numer = 0
         csvdocs = []
@@ -345,7 +357,18 @@ class CsvMapped(dict):
                     print("{} ".format(te))
                     print("skipped over the above line")
                     continue
-                csvdocs.append({h: cell.strip() for h, cell in zip(headers.values(), lineparts)})
+                line = {h: cell.strip() for h, cell in zip(headers.values(), lineparts)}
+                pprint(line)
+                csvdocs.append(line)
+        commands = createdbnames()[u'commandd'].keys()
+                #u'commandd' = {u'CUR': u'Column is in currency with decimal - Convert to Cents - (Implies NUMB)',
+                #             u'CENT': u"Convert & Treat value like whole Cents (Implies NUMB)",
+                #             u'NUMB': u"Turn Number-Strings into counting Integers",
+                #             u"NEW": u"Import Only if New or Blank in Existing Data",
+                #             u"REPLACE": u"Remove Existing Items that Have this Key (implies KEY)",
+                #             u"KEY": u"This Column Holds a 'Key' Lookup Value ",
+                #             u"ADD": u"Increment or Decrement (an existing Integer value) by This Much",
+                #             u"NO": u"Don't Use This Imported Column to Change Anything"}
 
         print(' {} items are to be gleaned from this CSV file: {} '.format(numer, self.fpath))
         return csvdocs
@@ -365,15 +388,21 @@ if __name__ == "__main__":
     currentdb = client.database_names()
     # dbmap is the hard-coded idea of the structure returned by createdbnames()
     col = ()
-    dbb = client['31cent']
+    dbb = client[u'31cent']
     for dbnm, dbvals in dbmap.viewitems():
-        print "dbb= ", dbb
+        # print "dbb= ", dbb
         if isinstance(dbvals, list):
-            col = dbb[dbnm].insert({asis: "" for asis in dbvals})
-            print "col from list= ", col, dbvals
+            col = dbb[dbnm].update({asis: "" for asis in dbvals}, {asis: "" for asis in dbvals}, upsert=True)
+            if col:
+                print("LLL col {} from list= {}".format(col, dbvals))
+            else:
+                print("LLL dbnm = {}  already exists...".format(dbnm))
         elif isinstance(dbvals, dict):
-            col = dbb[dbnm].insert(dbvals)
-            print "col from dict= ", col, dbvals
+            col = dbb[dbnm].update(dbvals, dbvals, upsert=True)
+            if col:
+                print("DDD added col from dict= {}".format(dbvals))
+            else:
+                print("DDD dbnm = {}  already exists...".format(dbnm))
         print("added database: {} w/ collection:".format(dbb[dbnm]))
         pprint(dbvals)
     print("created / verified databases named: ")
@@ -384,6 +413,7 @@ if __name__ == "__main__":
 
     # previously found mappings between CSV and DB columns:
     hdrs = stuffdb[u'import_headers']
+    directions = stuffdb[u'import_directions']
     importedfn = stuffdb[u'imported_flnms']
 
     # find database collection labels for 'explored' stuffdb
@@ -420,33 +450,46 @@ if __name__ == "__main__":
             print("Looking in {}".format(hdrs))
             print("for previous imports using: ")
             print("'{}'\n".format(hdrstring))
-            importmap = hdrs.find_one({u'hdrhash': hash(hdrstring)})
+            importmap = hdrs.find_one({u'hdrhash': hdrstring})
+            importdirections = directions.find_one({u'mapstring': hdrstring})
             print('importmap? (keyed by line #{}: {}): '.format(np, hdrstring))
             pprint(importmap)
+            print(" ... with directions:")
+            pprint(importdirections)
             if importmap:
                 print("^^^^^^^^^^^ total: {} columns ^^^^^^^^^^^".format(len(importmap)))
-                yesno = {0: "Use this map to import the file to database",
+                yesno = {0: "Use this map & directions to import the file to database",
                          1: "Throw it out and create new mapping"}
                 selnum, _ = selections(yesno, prompt="Select : ")
                 print(" your choice: {}".format(yesno[selnum]))
                 if selnum:
+                    hdrs.remove({u'hdrhash': hdrstring})
+                    directions.remove({u'mapstring': hdrstring})
                     importmap = None
+                    importdirections = None
 
             # if no import-map, create the import-map:
             if not importmap:
                 print("...creating import map ")
-                importmap = xmarks.headers_to_mongo(hdrs, hdrstring)
+                importmap, importdirections = xmarks.headers_to_mongo(hdrs, hdrstring)
                 if importmap:
                     print('hdrstring: {}'.format(hdrstring))
                     print('importmap ({} items):'.format(len(importmap)))
+                    print('special instructions: {}:'.format(importdirections))
                     pprint(importmap)
-                    # save the new map in database
-                    hdrs.insert(importmap)
-                    # need to include some rules about adding, subtracting quantities
+
             # using the import-map, dictify data stored in the instance
-            csvdocs = xmarks.parsedata(importmap, top_skip=np)
-            # on success, add the input filename to database of imported_fn
+            csvdocs = xmarks.parsedata(importmap, importdirections, top_skip=np)
+
             if csvdocs:
+                # on success, add the input filename to database of imported_fn
+                importedfn.update({u'fn': xmarks.fn_ctime(fpath)})
+                # save the new map in database because it has succeeded in making a csvdoc
+                importdirections.update({u'mapstring': hdrstring})
+                importmap.update({u'hdrhash': hdrstring})
+                hdrs.insert(importmap)
+                directions.insert(importdirections)
+
                 print("---------  Actions against CSV-import-lines  --------------------------")
                 actions = [u'Add/Subtract_Current_Quantities',
                            u'New_Data_Bulk_Insert',
@@ -455,9 +498,10 @@ if __name__ == "__main__":
                            u'Skip_this_Import']
                 actiondd = {a: t for a, t in enumerate(actions)}
                 actnum, actiontype = selections(actiondd, prompt="Choose the type of action to use on the data: ")
-
+                # DEBUG exit
+                exit(0)
                 # divide items that are in database, items out
-
+"""
                 # init bulk ops to insert many lines
                 bulk = overalldb.initialize_unordered_bulk_op()
                 if actiontype == u'New_Data_Bulk_Insert':
@@ -476,12 +520,11 @@ if __name__ == "__main__":
 
 
 
-
             # record the usage of the csv-file in the database along with action taken
-            importedfn.insert({xmarks.fn_ctime(fpath): actiontype})
+            #importedfn.insert({u'fn': xmarks.fn_ctime(fpath)})
         # assign correct info to correct keys for insertion into current db collection
-        addlist = []
-    """
+        #addlist = []
+
 for itemdd in csvdocs:
 csvstuff = {}
 # GWk come from manufacturer's csv-headers, dbv are in mongo database
@@ -519,6 +562,6 @@ with open('/home/suber1/Desktop/order.txt', 'ab') as ofob:
 ofob.write("{} - item: {:11} {:7} {} \n".format(ctr, item[u'sku'], item[u'price'], item[u'name']))
 """
 
-    print('Goodbye!')
-    exit(0)
+    #print('Goodbye!')
+   # exit(0)
 
