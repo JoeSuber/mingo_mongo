@@ -11,10 +11,10 @@ c) adjusting inventory count +/- the given number
 d) compare the csv against the database & report the differences
 5) scrape / interact with alliance / southern hobby / games-workshop / wizards ordering system
 """
-
+import pymongo
 from pymongo import MongoClient
-#from pymongo.errors import BulkWriteError
-from pymongo.errors import DuplicateKeyError
+#
+from pymongo.errors import DuplicateKeyError, PyMongoError
 from pymongo import ASCENDING, DESCENDING
 import os
 from pprint import pprint
@@ -54,8 +54,8 @@ def selections(dd=None, prompt='Choose from above'):
         return 0, None
     for choice, dbnm in dd.viewitems():
         print('{:4}- {}'.format(choice + 1, dbnm))
-    q = 0
-    while (q < 1) or (q > (choice + 1)):
+    q = -1000
+    while (q - 1) not in dd.keys():
         if len(dd) > 1:
             q = int(unicode(raw_input(prompt)))
         else:
@@ -288,9 +288,8 @@ class CsvMapped(dict):
 
         pprint(createdbnames()[self.cmd])
         #pprint(genmap)
-        instructions = {colname: unicode(raw_input("special instructions (comma separated) for |{}| : "
-                                                   .format(colname))) for colname in genmap.keys()}
-        return genmap, instructions
+
+        return genmap
 
     def ask_where_join(self, lpl):
         """
@@ -322,34 +321,42 @@ class CsvMapped(dict):
                 return "".join([h, q, h2, q, t2])
         return line
 
-    def parsedata(self, headers, directions, top_skip=0):
+    def parsedata(self, headers, headline, top_skip=0):
         """
         the previously read file is a list of lines stored in the instance. The lines
         are commonly split out by comma or other delimiter, then assigned to dict
         """
         extra_defs = []
+        string_ordered = []
+        # put the correct db-equivalent above the incoming columns
+        for column in headline.split(self.spltr):
+            for kk, vv in headers.viewitems():
+                if column == vv:
+                    string_ordered.append(kk)
         try:
             permits = headers.pop(u'_id')
-            instructions = headers.pop(u'hdrhash')
         except Exception as e:
             print("passed in headers probably lacked '_id' ")
             print("but they were cute so I let them in anyway... Error = {}".format(e))
         # set up the values that are defaults for every line
-        for val in headers.viewvalues():
+        for kky, val in headers.viewitems():
             if isinstance(val, unicode) and (self.defmark in val):
-                val.replace(self.defmark, "")
+                val = val.replace(self.defmark, " ")
                 if val == "":
                     pass
                 else:
-                    extra_defs.append(val)
+                    extra_defs.append(de_string(val))
+                    string_ordered.append(kky)
                     #print "parsedata says extra val is: ", val
 
         header_quant = len(headers)
         numer = 0
         csvdocs = []
+        #iterate over the full lines
         for numer, csvline in enumerate(self.thetext):
             # often skipping line zero as it should be the header-line
             if numer >= top_skip:
+                # fix some trip-ups in quoted data fields
                 csvline = self.decomma_quotes(csvline)
                 lineparts = csvline.split(self.comma)
                 #print ("lineparts: {}".format(lineparts))
@@ -374,8 +381,8 @@ class CsvMapped(dict):
                     print("{} ".format(te))
                     print("skipped over the above line")
                     continue
-                line = {h: cell.strip() for h, cell in zip(headers.values(), lineparts)}
-                pprint(line)
+                line = {h: de_string(cell.strip()) for h, cell in zip(string_ordered, lineparts)}
+                # pprint(line)
                 csvdocs.append(line)
         commands = createdbnames()[u'commandd'].keys()
                 #u'commandd' = {u'CUR': u'Column is in currency with decimal - Convert to Cents - (Implies NUMB)',
@@ -435,8 +442,7 @@ if __name__ == "__main__":
     overalldb, stuffdb = explore(0, client)
 
     # some collections to load up:
-    hdrs = stuffdb[u'import_directions']
-
+    hdrs = overalldb[u'import_directions']
 
     # find database collection labels for 'explored' stuffdb
     labelset = set()
@@ -472,11 +478,12 @@ if __name__ == "__main__":
             print("Looking in {}".format(hdrs))
             print("for previous imports using: ")
             print("'{}'\n".format(hdrstring))
-            importmap = hdrs.find_one({u'headline': hdrstring})[u'csv_to_db']
-            print('importmap? (keyed by line #{}: {}): '.format(np, hdrstring))
-            pprint(importmap)
+            importmap = hdrs.find_one({u'headline': hdrstring})
             if importmap:
-                print("^^^^^^^^^^^ total: {} columns ^^^^^^^^^^^".format(len(importmap)))
+                minimap = importmap[u'csv_to_db']
+                print('importmap? (keyed by line #{}: {}): '.format(np, hdrstring))
+                pprint(importmap)
+                print("^^^^^^^^^^^ total: {} columns ^^^^^^^^^^^".format(len(minimap)))
                 yesno = {0: "Use this map & directions to import the file to database",
                          1: "Throw it out and create new mapping"}
                 selnum, _ = selections(yesno, prompt="Select : ")
@@ -489,34 +496,34 @@ if __name__ == "__main__":
             # if no import-map, create the import-map:
             if not importmap:
                 print("...creating import map ")
-                importmap, importdirections = xmarks.headers_to_mongo(hdrs, hdrstring)
+                importmap = xmarks.headers_to_mongo(hdrs, hdrstring)
                 if importmap:
                     print('hdrstring: {}'.format(hdrstring))
                     print('importmap ({} items):'.format(len(importmap)))
-                    print('special instructions: {}:'.format(importdirections))
                     pprint(importmap)
 
             # using the import-map, dictify data stored in the instance
-            csvdocs = xmarks.parsedata(importmap, importdirections, top_skip=np)
+            csvdocs = xmarks.parsedata(importmap, hdrstring, top_skip=np)
 
             if csvdocs:
+                # the bulk-op:
+                finished = 0
+                for finished, doc in enumerate(csvdocs):
+                    try:
+                        stuffdb.insert(doc)
+                    except pymongo.errors.DuplicateKeyError as dup:
+                        print('##########  {}  #######'.format(finished))
+                        print(dup)
+                print("finished = {}".format(finished))
                 # on success, add the input filename to database of imported_fn
-                hdrs.update({u'filepath': xmarks.fn_ctime(fpath)})
                 # save the new map in database because it has succeeded in making a csvdoc
-                importmap.update({u'headline': hdrstring})
-                hdrs.insert(importmap)
-
-
+                hdrs.insert({u'headline': hdrstring})
+                hdrs.insert({u'filepath': xmarks.fn_ctime(fpath)})
+                hdrs.insert({u'special_commands': None})
+                hdrs.insert({u'for_collection': unicode(stuffdb)})
+                hdrs.insert({u'csv_to_db': importmap})
                 print("---------  Actions against CSV-import-lines  --------------------------")
-                actions = [u'Add/Subtract_Current_Quantities',
-                           u'New_Data_Bulk_Insert',
-                           u'Current_Price_Changes',
-                           u'Update_and_Add_Data_(not_quantities)',
-                           u'Skip_this_Import']
-                actiondd = {a: t for a, t in enumerate(actions)}
-                actnum, actiontype = selections(actiondd, prompt="Choose the type of action to use on the data: ")
-                # DEBUG exit
-                exit(0)
+
                 # divide items that are in database, items out
 """
                 # init bulk ops to insert many lines
