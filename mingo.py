@@ -376,12 +376,9 @@ class CsvMapped(dict):
         for kky, val in headers.viewitems():
             if isinstance(val, unicode) and (self.defmark in val):
                 val = val.replace(self.defmark, " ")
-                if val == " ":
-                    pass
-                else:
-                    extra_defs.append(de_string(val))
-                    string_ordered.append(kky)
-                    #print "parsedata says extra val is: ", val
+                extra_defs.append(de_string(val))
+                string_ordered.append(kky)
+                #print "parsedata says extra val is: ", val
 
         header_quant = len(headers)
         numer = 0
@@ -416,7 +413,7 @@ class CsvMapped(dict):
                     continue
                 line, remover = {}, None
                 for h, cell in zip(string_ordered, lineparts):
-                    line[h] = de_string(cell.strip())
+                    line[h] = de_string(cell)
                 # extrapolate some things given other things
                 if len(line[u'sku_alliance']) > 4:
                     line[u'mfr_3letter'] = line[u'sku_alliance'][:3]
@@ -550,8 +547,10 @@ if __name__ == "__main__":
                 print("finished = {}".format(finished))
                 # on success, add the input filename to database of imported_fn
                 # save the new map in database because it has succeeded in making a csvdoc
-                hdrs.insert({u'headline': hdrstring})
-                hdrs.insert({u'filepath': xmarks.fn_ctime(fpath)})
+                importmap.update({u'filepath': xmarks.fn_ctime(fpath)})
+                importmap.update({u'special_commands': importdirections})
+                hdrs.update({u'headline': hdrstring}, )
+                hdrs.update({u'filepath': xmarks.fn_ctime(fpath)}, importmap)
                 hdrs.insert({u'special_commands': importdirections})
                 hdrs.insert({u'for_collection': unicode(stuffdb)})
                 hdrs.insert({u'csv_to_db': importmap})
