@@ -76,10 +76,11 @@ def createdbnames(dbd=None):
                u'my_customers': [u'my_cust_id', u'email', u'requested_this', u'pre_paid_for', u'credit_file',
                                  u'face_rec', u'purchased', u'returned', u'ebay_notes', u'paid_on_invoice',
                                  u'shipped_out_date', u'ship_tracked', u'ship_rcvd', u'notes'],
-               u'my_interns': [u'contact', u'email', u'schedule_past', u'schedule_future', u'good_things', u'bad_things'],
-               u'store_inventory': [u'description', u'we_sell_price', u'multipack_sku',
-                                    u'multipack_quant', u'multiprice', u'manufacturer', u'barcode', u'we_buy_cost',
-                                    u'date_modified', u'quant_on_invoice', u'sku_for1', u'mfr_3letter', u'sku_alliance',
+               u'my_interns': [u'phone', u'contact', u'email', u'schedule_past', u'schedule_future',
+                               u'good_things', u'bad_things'],
+               u'store_inventory': [u'barcode', u'sku_main', u'description', u'we_sell_price', u'multipack_sku',
+                                    u'multipack_quant', u'multiprice', u'price_is_NET', u'manufacturer',  u'we_buy_cost',
+                                    u'date_modified', u'quant_on_invoice', u'mfr_3letter', u'sku_alliance',
                                     u'sku_alt', u'increment_quant', u'decrement_quant', u'current_whole_quant',
                                     u'desired_quant', u'notes'],
                u'stocking': [u'string_id', u'description', u'we_bought_history',
@@ -88,25 +89,33 @@ def createdbnames(dbd=None):
                u'index_keys': {u'manufacturer': [(u'3letter_code', 1)],
                                u'my_customers': [(u'my_cust_id', 1), (u'email', 1)],
                                u'my_interns': [(u'email', 1)],
-                               u'store_inventory': [(u'sku_for1', 1), (u'barcode', 1), (u'sku_alt', 1)],
+                               u'store_inventory': [(u'sku_main', 1), (u'barcode', 1), (u'description', 1)],
                                u'stocking': [(u'string_id', 1)],
                                u'import_directions': [(u'filepath', 1)],
                                u'index_keys': [(u'index_keys', 1)],
                                u'commandd': [(u'CUR', 1)]},
                u'import_directions': {u'headline': u'this|!is_not|!a_real|!header|!string',
-                                      u'filepath': u'/some/once/valid/file_path.csv|23423234.23',
-                                      u'special_commands': u'0,NUMB,3,NO',
+                                      u'filepath': u'/some_once/timestamped/valid/file_path.csv|23423234.23',
+                                      u'special_commands': [u'ALLCAPS_CMD', u'LIST', u'ODD_DIRECTIVES'],
                                       u'csv_to_db': {u'this': u'barcode',
                                                      u'is_not': u'description',
-                                                     u'a_real': u'quant_on_invoice',
-                                                     u'string': u'we_sell_price'}},
-               u'commandd': {u'CUR': u'Column is in currency with decimal - Convert to Cents - (Implies NUMB)',
-                             u'NUMB': u"Number-Strings into Integers (leave off decimal point)",
-                             u"NEW": u"Import Only if New or Blank in Existing Data",
-                             u"REPLACE": u"Remove Existing Items that Have this Key (implies KEY)",
-                             u"KEY": u"This Column Holds a 'Key' Lookup Value ",
-                             u"ADD": u"Increment or Decrement (an existing Integer value) by This Much",
-                             u"NO": u"Don't Use This Imported Column to Change Anything"}
+                                                     u'a_real': u'sku_main',
+                                                     u'string': u'we_sell_price',
+                                                     u'and_more': u'etc'}},
+               u'commandd': {u'NEW_ITEMS': u'Simple import of only the new stuff in the import file, NOT FOR INVOICES',
+                             u'OVERWRITE_ALL': u' - DANGER - Destroys existing info if shared by incoming items',
+                             u'BARCODE_UP': u"Find the main-sku in current items, change barcode to imported value",
+                             u"SPEC_XXX": u"'XXX' is the 3-letter manufacturer code. RPR GAW etc. For odd tasks.",
+                             u"INCREMENT": u"find 'sku_main', 'sku_alt', or 'sku_alliance' and apply 'increment_quant'",
+                             u"DECREMENT": u"find the 'sku...' or 'barcode' and well, you know.",
+                             u"PRICE_UP": u"Update 'price_we_sell' if new price is higher",
+                             u"PRICE_DELTA": u"Update prices due to any changes, up or down.",
+                             u"PRICE_COMPUTE_NET_XX": u"use XX% divided into 'we_sell_price' when price is NET",
+                             u"AUTO": u"zip through changes to existing data without stopping for approval",
+                             u"INTERACT": u"Step through each change to existing db-values so it may be approved",
+                             u"ALLIANCE_MFG": u"Generate 'Manufacturer' from Alliance catalog numbers",
+                             u"UNIQUE_abcdef": u"'abcdef' is an incoming db-field-value checked for uniqueness.",
+                             u"NEVER": u"Don't Use This Imported Column to Change Anything"}
                }
         return dbd
 
@@ -131,10 +140,8 @@ def explore(done, client):
     usedb_name, collection_name = None, None
     while not done:
         clientnames = {num: clnm for num, clnm in enumerate(client.database_names())}
-        key, usedb_name = selections(clientnames, prompt='Choose the number of mongo db to be explored: ')
+        key, usedb_name = selections(clientnames, prompt='Choose database to be used: ')
         print('okay - choice was {:3} - {} \n'.format(key+1, usedb_name))
-        if not usedb_name:
-            usedb_name = u"31cent"
         primarydb = client[usedb_name]
         primaries = {num: unicode(pri) for num, pri in enumerate(primarydb.collection_names())}
         key, collection_name = selections(primaries, prompt='Choose the collection within {} to explore: '.format(usedb_name))
@@ -176,6 +183,7 @@ class CsvMapped(dict):
         self.startlooking = startlooking
         self.catlist = createdbnames()[u'store_inventory']
         self.cmd = cmd
+        self.suppliers = None
 
     def fn_ctime(self, fn):
         """
@@ -200,7 +208,7 @@ class CsvMapped(dict):
                     for filename in filenames if filename.endswith(looking_for)]
         fn_dd = {ctr: fn for ctr, fn in enumerate(csvfiles)}
 
-        # create unique key for filename to prevent re-import of the same data
+        # create consistent keys for files to prevent re-import of the same data
         longfnkey = {}
         for num, fnv in fn_dd.viewitems():
             longfnkey.update({self.fn_ctime(fnv): num})
@@ -252,7 +260,6 @@ class CsvMapped(dict):
         pprint(catchoice)
         catcutoff = len(catchoice) - catstart
         genmap = {}
-        hdr_key_list = []
         total = len(hdrlist)
         for togo, (dbhdrkey, dbhdr) in enumerate(hdrlist.viewitems()):
             print('.............  {} .........................................'.format(total - togo))
@@ -286,10 +293,37 @@ class CsvMapped(dict):
                     genmap[leftover] = self.defmark + unicode(raw_input(
                         " ALL '{}' will have a value = : ".format(leftover))).decode()
 
-        pprint(createdbnames()[self.cmd])
-        #pprint(genmap)
-
-        return genmap
+        spec_dd = db[u'commandd']
+        if spec_dd:
+            spec_choice = {num: (choice, description) for num, (choice, description) in enumerate(spec_dd.find())}
+            spec_choice.update({len(spec_choice): (" - DONE -", "quit assigning specials")})
+            num, choice, spec_list = -1000, ("", ""), []
+            while choice[0] is not " - DONE -":
+                num, choice = selections(spec_choice, prompt="Pick special actions from above: ")
+                spec_choice.pop(num)
+                if u'X' in choice[0]:
+                    NEED_DIGITS = True
+                    while NEED_DIGITS:
+                        digits = unicode(raw_input("Input digits: "))
+                        try:
+                            if int(digits) > 0:
+                                NEED_DIGITS = False
+                                choice = choice[0].replace(u'X', "") + digits
+                        except Exception as e:
+                            print(" Whoops... {}".format(e))
+                            print(" Input only positive integers please...")
+                            NEED_DIGITS = True
+                elif u"UNIQUE" in choice[0]:
+                    num, category = selections(hdrlist, "Pick the header under which all values are to be unique: ")
+                    choice = choice[0].split(u'_')[0] + u'_' + category
+                elif u"SPEC" in choice[0]:
+                    mfgrs = {num: mfr for num, mfr in enumerate(db[u'manufacturer'][u'3letter_code'].find())}
+                    num, category = selections(mfgrs, "Which manufacturer code to attach to special: ")
+                    choice = choice[0].split(u'_')[0] + u'_' + category
+                spec_list.append(choice)
+        else:
+            spec_list = []
+        return genmap, spec_list
 
     def ask_where_join(self, lpl):
         """
@@ -321,7 +355,7 @@ class CsvMapped(dict):
                 return "".join([h, q, h2, q, t2])
         return line
 
-    def parsedata(self, headers, headline, top_skip=0):
+    def parsedata(self, headers, headline, speclist, top_skip=0):
         """
         the previously read file is a list of lines stored in the instance. The lines
         are commonly split out by comma or other delimiter, then assigned to dict
@@ -342,7 +376,7 @@ class CsvMapped(dict):
         for kky, val in headers.viewitems():
             if isinstance(val, unicode) and (self.defmark in val):
                 val = val.replace(self.defmark, " ")
-                if val == "":
+                if val == " ":
                     pass
                 else:
                     extra_defs.append(de_string(val))
@@ -353,16 +387,15 @@ class CsvMapped(dict):
         numer = 0
         csvdocs = []
         #iterate over the full lines
+
         for numer, csvline in enumerate(self.thetext):
             # often skipping line zero as it should be the header-line
             if numer >= top_skip:
                 # fix some trip-ups in quoted data fields
                 csvline = self.decomma_quotes(csvline)
                 lineparts = csvline.split(self.comma)
-                #print ("lineparts: {}".format(lineparts))
-                #print ("extra_defs: {}".format(extra_defs))
                 lineparts.extend(extra_defs)
-                #print "lineparts after extend: ", lineparts
+                # print "lineparts after extend: ", lineparts
                 try:
                     assert(header_quant == len(lineparts))
                 except AssertionError:
@@ -381,20 +414,22 @@ class CsvMapped(dict):
                     print("{} ".format(te))
                     print("skipped over the above line")
                     continue
-                line = {h: de_string(cell.strip()) for h, cell in zip(string_ordered, lineparts)}
+                line, remover = {}, None
+                for h, cell in zip(string_ordered, lineparts):
+                    line[h] = de_string(cell.strip())
+                # extrapolate some things given other things
+                if len(line[u'sku_alliance']) > 4:
+                    line[u'mfr_3letter'] = line[u'sku_alliance'][:3]
+                if 0 < line[u'price_is_NET'] < 100:
+                    line[u'price_we_sell'] = int((line[u'price_we_sell']/float(line[u'price_is_NET']/100.0)) * 100)
+                if (line[u'mfr_3letter'] in self.suppliers) and (line[u'mfr_3letter'] not in line[u'sku_main']):
+                    line[u'sku_main'] = line[u'mfr_3letter'] + " " + line[u'sku_main']
+
+
                 # pprint(line)
                 csvdocs.append(line)
-        commands = createdbnames()[u'commandd'].keys()
-                #u'commandd' = {u'CUR': u'Column is in currency with decimal - Convert to Cents - (Implies NUMB)',
-                #             u'CENT': u"Convert & Treat value like whole Cents (Implies NUMB)",
-                #             u'NUMB': u"Turn Number-Strings into counting Integers",
-                #             u"NEW": u"Import Only if New or Blank in Existing Data",
-                #             u"REPLACE": u"Remove Existing Items that Have this Key (implies KEY)",
-                #             u"KEY": u"This Column Holds a 'Key' Lookup Value ",
-                #             u"ADD": u"Increment or Decrement (an existing Integer value) by This Much",
-                #             u"NO": u"Don't Use This Imported Column to Change Anything"}
 
-        print(' {} items are to be gleaned from this CSV file: {} '.format(numer, self.fpath))
+        print(" {} items are to be gleaned from this '{}' delimited file: {} ".format(numer, self.comma, self.fpath))
         return csvdocs
 
 
@@ -444,15 +479,11 @@ if __name__ == "__main__":
     # some collections to load up:
     hdrs = overalldb[u'import_directions']
 
-    # find database collection labels for 'explored' stuffdb
-    labelset = set()
-    for hp in stuffdb.find():
-        labelset = set(kk[0] for kk in hp.viewitems())
-    print('labelset (from things already in db): ')
-    pprint(labelset)
-
     # validate found source files for potential input into db
     new_fn_dd = xmarks.csvsources(hdrs, startdir=None, looking_for='.csv')
+
+    xmarks.suppliers = {num: mfr for num, mfr in enumerate(overalldb[u'manufacturer'][u'3letter_code'].find())}
+    print("suppliers: {}".format(xmarks.suppliers))
 
     # now have user choose one source-file until none left or done:
     selnum = 0
@@ -478,48 +509,50 @@ if __name__ == "__main__":
             print("Looking in {}".format(hdrs))
             print("for previous imports using: ")
             print("'{}'\n".format(hdrstring))
-            importmap = hdrs.find_one({u'headline': hdrstring})
-            if importmap:
-                minimap = importmap[u'csv_to_db']
-                print('importmap? (keyed by line #{}: {}): '.format(np, hdrstring))
+            previous_import = hdrs.find_one({u'headline': hdrstring})
+            if previous_import:
+                importmap = previous_import[u'csv_to_db']
+                importdirections = previous_import[u'special_commands']
+                print('Use the following importmap? (keyed by line #{}: {}): '.format(np, hdrstring))
                 pprint(importmap)
-                print("^^^^^^^^^^^ total: {} columns ^^^^^^^^^^^".format(len(minimap)))
-                yesno = {0: "Use this map & directions to import the file to database",
-                         1: "Throw it out and create new mapping"}
-                selnum, _ = selections(yesno, prompt="Select : ")
-                print(" your choice: {}".format(yesno[selnum]))
+                print("^^^^^^^^^^^ total: {} columns ^^^^^^^^^^^".format(len(importmap)))
+                print("      Special Directions regarding this kind of file:")
+                pprint(importdirections)
+                selnum, choice = selections({0: "Use this map & directions to import the file to database",
+                                             1: "Throw it out and create new mapping"}, prompt="Select : ")
+                print(" your choice: {}".format(choice))
                 if selnum:
                     hdrs.remove({u'headline': hdrstring})
-                    importmap = None
-                    importdirections = None
-
+                    previous_import = None
+                    importmap = {}
+                    importdirections = []
             # if no import-map, create the import-map:
-            if not importmap:
+            else:
                 print("...creating import map ")
-                importmap = xmarks.headers_to_mongo(hdrs, hdrstring)
+                importmap, importdirections = xmarks.headers_to_mongo(hdrs, hdrstring)
                 if importmap:
                     print('hdrstring: {}'.format(hdrstring))
                     print('importmap ({} items):'.format(len(importmap)))
+                    print('')
                     pprint(importmap)
 
             # using the import-map, dictify data stored in the instance
-            csvdocs = xmarks.parsedata(importmap, hdrstring, top_skip=np)
+            csvdocs = xmarks.parsedata(importmap, hdrstring, importdirections, top_skip=np)
 
             if csvdocs:
                 # the bulk-op:
                 finished = 0
                 for finished, doc in enumerate(csvdocs):
                     try:
-                        stuffdb.insert(doc)
+                        stuffdb.update({u'barcode': doc[u'barcode'], u'sku_main': doc[u'sku_main']}, doc, upsert=True)
                     except pymongo.errors.DuplicateKeyError as dup:
-                        print('##########  {}  #######'.format(finished))
-                        print(dup)
+                        print('##########  {}  #######  {}'.format(finished, dup))
                 print("finished = {}".format(finished))
                 # on success, add the input filename to database of imported_fn
                 # save the new map in database because it has succeeded in making a csvdoc
                 hdrs.insert({u'headline': hdrstring})
                 hdrs.insert({u'filepath': xmarks.fn_ctime(fpath)})
-                hdrs.insert({u'special_commands': None})
+                hdrs.insert({u'special_commands': importdirections})
                 hdrs.insert({u'for_collection': unicode(stuffdb)})
                 hdrs.insert({u'csv_to_db': importmap})
                 print("---------  Actions against CSV-import-lines  --------------------------")
