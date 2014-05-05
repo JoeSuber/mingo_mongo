@@ -45,9 +45,9 @@ actions = {0: "Import new data / inventory (don't write-over old)",
 
 def selections(dd=None, prompt='Choose from above'):
     """
-    given dict of numbered options like {1: 'choose me', ...}
-    present user with options and return the chosen integer key and value string
-    """
+given dict of numbered options like {1: 'choose me', ...}
+present user with options and return the chosen integer key and value string
+"""
     choice = 1
     if not dd:
         print('selections: empty choice dictionary, returning 0')
@@ -66,11 +66,11 @@ def selections(dd=None, prompt='Choose from above'):
 
 def createdbnames(dbd=None):
     """
-    my pie-in-the-sky plans to automate all the drudge and operate using real data
-    (lists are to be converted to keys of dict with empty values when initializing db)
-    """
+my pie-in-the-sky plans to automate all the drudge and operate using real data
+(lists are to be converted to keys of dict with empty values when initializing db)
+"""
     if not dbd:
-        dbd = {u'manufacturer': {u'3letter_code': u'GAW',  u'Full_Name': u'Games_Workshop', u'Contact_Phone': u'',
+        dbd = {u'manufacturer': {u'3letter_code': u'GAW', u'Full_Name': u'Games_Workshop', u'Contact_Phone': u'',
                                  u'Contact_email': u'', u'Contact_Web': u'',
                                  u'Sales_Rep': u'Ben Cumming', u'My_Account': 0},
                u'my_customers': [u'my_cust_id', u'email', u'requested_this', u'pre_paid_for', u'credit_file',
@@ -79,7 +79,7 @@ def createdbnames(dbd=None):
                u'my_interns': [u'phone', u'contact', u'email', u'schedule_past', u'schedule_future',
                                u'good_things', u'bad_things'],
                u'store_inventory': [u'barcode', u'sku_main', u'description', u'we_sell_price', u'multipack_sku',
-                                    u'multipack_quant', u'multiprice', u'price_is_NET', u'manufacturer',  u'we_buy_cost',
+                                    u'multipack_quant', u'multiprice', u'price_is_NET', u'manufacturer', u'we_buy_cost',
                                     u'date_modified', u'quant_on_invoice', u'mfr_3letter', u'sku_alliance',
                                     u'sku_alt', u'increment_quant', u'decrement_quant', u'current_whole_quant',
                                     u'desired_quant', u'notes'],
@@ -133,9 +133,9 @@ def de_string(i, isint=True):
 
 def explore(done, client):
     """
-    Allow exploration of key:value storage in existing mongod instance
-    Also selects the database.collection to be used / toyed with.
-    """
+Allow exploration of key:value storage in existing mongod instance
+Also selects the database.collection to be used / toyed with.
+"""
     thestuffdb, primarydb = None, None
     usedb_name, collection_name = None, None
     while not done:
@@ -162,18 +162,18 @@ def explore(done, client):
                 for plc, item in enumerate(thestuffdb.find()):
                     print('#{:6}: {}'.format(plc, item))
 
-    print(' @!@!@!@!    Active mongo parts: {}.{}    !@!@!@!@\n'.format(usedb_name, collection_name))
+    print(' @!@!@!@! Active mongo parts: {}.{} !@!@!@!@\n'.format(usedb_name, collection_name))
     return primarydb, thestuffdb
 
 
 class CsvMapped(dict):
     """
-    Provides persistent pairing of parsed page parts particularly to Mongodb
-    collection dicts. Mappings can be defined here and also load, if available,
-    mappings created earlier during interactive matching process. Goal is
-    to map a csv-source file to database once & from that time forward, have
-    similarly headed documents automatically recognized & imported.
-    """
+Provides persistent pairing of parsed page parts particularly to Mongodb
+collection dicts. Mappings can be defined here and also load, if available,
+mappings created earlier during interactive matching process. Goal is
+to map a csv-source file to database once & from that time forward, have
+similarly headed documents automatically recognized & imported.
+"""
     def __init__(self, startlooking='Desktop', cmd=u'commandd'):
         self.fpath = ''
         self.thetext = ''
@@ -262,7 +262,7 @@ class CsvMapped(dict):
         genmap = {}
         total = len(hdrlist)
         for togo, (dbhdrkey, dbhdr) in enumerate(hdrlist.viewitems()):
-            print('.............  {} .........................................'.format(total - togo))
+            print('............. {} .........................................'.format(total - togo))
             print('of {} columns in csv-file, we still must assign {} a place'.format(total, total - togo))
             selnum, selcategory = selections(catchoice,
                                              prompt='- HEADER MAP - Select Match for |{}| : '.format(dbhdr))
@@ -293,6 +293,7 @@ class CsvMapped(dict):
                     genmap[leftover] = self.defmark + unicode(raw_input(
                         " ALL '{}' will have a value = : ".format(leftover))).decode()
 
+        # gather, attach & record user-commands
         spec_dd = db[u'commandd']
         if spec_dd:
             spec_choice = {num: (choice, description) for num, (choice, description) in enumerate(spec_dd.find())}
@@ -446,7 +447,7 @@ if __name__ == "__main__":
     while (choice == 'Name A New Main Database') or (choice is None):
         choice = unicode(raw_input(u"Type in the new Database name :"))
         if (u"." in choice) or (u"'" in choice) or (u"\\" in choice) or (u'"' in choice):
-            print(u"Don't use those funny characters \n  Try Again \n")
+            print(u"Don't use those funny characters \n Try Again \n")
             choice = None
 
     # dbmap is the hard-coded preliminary idea of the db structure as a dict
@@ -489,7 +490,7 @@ if __name__ == "__main__":
         if fpath == " - NONE - ":
             print("All done!")
             break
-        if selnum != (len(new_fn_dd) - 1):  # ie, the last choice, - DONE -
+        if selnum != (len(new_fn_dd) - 1): # ie, the last choice, - DONE -
             # open file, determine header
             # side effect: text body inside CsvMapped instance
             hdrstring, np = '', 0
@@ -513,7 +514,7 @@ if __name__ == "__main__":
                 print('Use the following importmap? (keyed by line #{}: {}): '.format(np, hdrstring))
                 pprint(importmap)
                 print("^^^^^^^^^^^ total: {} columns ^^^^^^^^^^^".format(len(importmap)))
-                print("      Special Directions regarding this kind of file:")
+                print(" Special Directions regarding this kind of file:")
                 pprint(importdirections)
                 selnum, choice = selections({0: "Use this map & directions to import the file to database",
                                              1: "Throw it out and create new mapping"}, prompt="Select : ")
@@ -539,11 +540,37 @@ if __name__ == "__main__":
             if csvdocs:
                 # the bulk-op:
                 finished = 0
+
                 for finished, doc in enumerate(csvdocs):
-                    try:
-                        stuffdb.update({u'barcode': doc[u'barcode'], u'sku_main': doc[u'sku_main']}, doc, upsert=True)
-                    except pymongo.errors.DuplicateKeyError as dup:
-                        print('##########  {}  #######  {}'.format(finished, dup))
+                    # if working on inventory lines to db, do some hacks & hardcoded relations
+                    if u'sku_alliance' in doc.keys():
+                        # if sku_main is blank, fill it
+                        if (len(doc[u'sku_alliance']) > 4) and (len(doc[u'sku_main']) < 4):
+                            doc[u'sku_main'] = doc[u'sku_alliance'] or doc[u'sku_alt']
+                        # transfer 3-letter manufacturer from alliance
+                        if (len(doc[u'mfr_3letter']) < 3) and (doc[u'sku_alliance'] > 4):
+                            doc[u'mfr_3letter'] = doc[u'sku_alliance'][:3]
+                        # tack on mfr code if it isn't in sku_main
+                        if ((len(doc[u'mfr_3letter']) >= 3) and
+                                (doc[u'mfr_3letter'] not in doc[u'sku_main']) and
+                                (doc[u'mfr_3letter']) in xmarks.suppliers):
+                            doc[u'sku_main'] = doc[u'mfr_3letter'] + " " + doc[u'sku_main']
+                        if doc[u'decrement_quant']:
+                            doc[u'increment_quant'] -= doc[u'decrement_quant']
+                        if doc[u'barcode'] == doc[]
+                        # see if the item has a pre-existing entry in data
+                        lookup = (stuffdb.find_one({u'barcode': doc[u'barcode']}) or
+                                  stuffdb.find_one({u'sku_main': doc[u'sku_main']}) or
+                                  stuffdb.find_one({u'sku_alt': doc[u'sku_alt']}))
+                        if (not lookup) and (doc[u'current_whole_quant']) and ()
+                        if lookup and doc[u'increment_quant']:
+                            doc[u'current_whole_quant'] = lookup[u'current_whole_quant'] + doc[u'increment_quant']
+
+                    if lookup:
+                        try:
+                            stuffdb.update({u'barcode': doc[u'barcode'], u'sku_main': doc[u'sku_main']}, doc, upsert=True)
+                        except pymongo.errors.DuplicateKeyError as dup:
+                            print('########## {} ####### {}'.format(finished, dup))
                 print("finished = {}".format(finished))
                 # on success, add the input filename to database of imported_fn
                 # save the new map in database because it has succeeded in making a csvdoc
@@ -551,35 +578,34 @@ if __name__ == "__main__":
                 importmap.update({u'special_commands': importdirections})
                 hdrs.update({u'headline': hdrstring}, )
                 hdrs.update({u'filepath': xmarks.fn_ctime(fpath)}, importmap)
-                hdrs.insert({u'special_commands': importdirections})
-                hdrs.insert({u'for_collection': unicode(stuffdb)})
+
                 hdrs.insert({u'csv_to_db': importmap})
-                print("---------  Actions against CSV-import-lines  --------------------------")
+                print("--------- Actions against CSV-import-lines --------------------------")
 
                 # divide items that are in database, items out
 """
-                # init bulk ops to insert many lines
-                bulk = overalldb.initialize_unordered_bulk_op()
-                if actiontype == u'New_Data_Bulk_Insert':
-                    for addline in csvdocs:
-                        if u'barcode' in importmap:
-                            bulk.find(addline[u'barcode'])
+# init bulk ops to insert many lines
+bulk = overalldb.initialize_unordered_bulk_op()
+if actiontype == u'New_Data_Bulk_Insert':
+for addline in csvdocs:
+if u'barcode' in importmap:
+bulk.find(addline[u'barcode'])
 
-                WORKING = True
-                while WORKING:
-                    try:
-                        bulk.execute()
-                        WORKING = False
-                    except BulkWriteError as bwe:
-                        WORKING = True
-                        pprint(bwe.details)
+WORKING = True
+while WORKING:
+try:
+bulk.execute()
+WORKING = False
+except BulkWriteError as bwe:
+WORKING = True
+pprint(bwe.details)
 
 
 
-            # record the usage of the csv-file in the database along with action taken
-            #importedfn.insert({u'fn': xmarks.fn_ctime(fpath)})
-        # assign correct info to correct keys for insertion into current db collection
-        #addlist = []
+# record the usage of the csv-file in the database along with action taken
+#importedfn.insert({u'fn': xmarks.fn_ctime(fpath)})
+# assign correct info to correct keys for insertion into current db collection
+#addlist = []
 
 for itemdd in csvdocs:
 csvstuff = {}
