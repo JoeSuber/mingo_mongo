@@ -500,7 +500,7 @@ if __name__ == "__main__":
                     print("Stopped due to {} blank lines on top instead of column-headers".format(np))
                     break
 
-            # look up header in database find import map
+            # look up top-line/header in database to possibly find import map
             print("Looking in {}".format(hdrs))
             print("for previous imports using: ")
             print("'{}'\n".format(hdrstring))
