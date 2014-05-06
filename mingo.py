@@ -557,7 +557,7 @@ if __name__ == "__main__":
                             doc[u'sku_main'] = doc[u'mfr_3letter'] + " " + doc[u'sku_main']
                         if doc[u'decrement_quant']:
                             doc[u'increment_quant'] -= doc[u'decrement_quant']
-                        if doc[u'barcode'] == doc[]
+                        if doc[u'barcode'] == doc[xxx]
                         # see if the item has a pre-existing entry in data
                         lookup = (stuffdb.find_one({u'barcode': doc[u'barcode']}) or
                                   stuffdb.find_one({u'sku_main': doc[u'sku_main']}) or
