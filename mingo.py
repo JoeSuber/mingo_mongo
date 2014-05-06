@@ -385,7 +385,6 @@ similarly headed documents automatically recognized & imported.
         numer = 0
         csvdocs = []
         #iterate over the full lines
-
         for numer, csvline in enumerate(self.thetext):
             # often skipping line zero as it should be the header-line
             if numer >= top_skip:
@@ -422,8 +421,6 @@ similarly headed documents automatically recognized & imported.
                     line[u'price_we_sell'] = int((line[u'price_we_sell']/float(line[u'price_is_NET']/100.0)) * 100)
                 if (line[u'mfr_3letter'] in self.suppliers) and (line[u'mfr_3letter'] not in line[u'sku_main']):
                     line[u'sku_main'] = line[u'mfr_3letter'] + " " + line[u'sku_main']
-
-
                 # pprint(line)
                 csvdocs.append(line)
 
@@ -474,7 +471,7 @@ if __name__ == "__main__":
     # user chooses the database and collection we are messing with:
     overalldb, stuffdb = explore(0, client)
 
-    # some collections to load up:
+    # some collections to be used no matter what:
     hdrs = overalldb[u'import_directions']
 
     # validate found source files for potential input into db
@@ -557,16 +554,19 @@ if __name__ == "__main__":
                             doc[u'sku_main'] = doc[u'mfr_3letter'] + " " + doc[u'sku_main']
                         if doc[u'decrement_quant']:
                             doc[u'increment_quant'] -= doc[u'decrement_quant']
-                        if doc[u'barcode'] == doc[xxx]
+                        if doc[u'barcode'] == doc[u'sku_main']:
+                            try:
+                                doc[u'barcode'] = barcode_lookup(doc[u'sku_main'])
                         # see if the item has a pre-existing entry in data
-                        lookup = (stuffdb.find_one({u'barcode': doc[u'barcode']}) or
+                        in_db = (stuffdb.find_one({u'barcode': doc[u'barcode']}) or
                                   stuffdb.find_one({u'sku_main': doc[u'sku_main']}) or
                                   stuffdb.find_one({u'sku_alt': doc[u'sku_alt']}))
-                        if (not lookup) and (doc[u'current_whole_quant']) and ()
-                        if lookup and doc[u'increment_quant']:
-                            doc[u'current_whole_quant'] = lookup[u'current_whole_quant'] + doc[u'increment_quant']
 
-                    if lookup:
+                        if in_db and doc[u'increment_quant']:
+                            doc[u'current_whole_quant'] = in_db[u'current_whole_quant'] + doc[u'increment_quant']
+                        elif doc[u'increment_quant'] > 0:
+                            doc[u'current_whole_quant'] += doc[u'increment_quant']
+                    if in_db:
                         try:
                             stuffdb.update({u'barcode': doc[u'barcode'], u'sku_main': doc[u'sku_main']}, doc, upsert=True)
                         except pymongo.errors.DuplicateKeyError as dup:
