@@ -11,14 +11,12 @@ c) adjusting inventory count +/- the given number
 d) compare the csv against the database & report the differences
 5) scrape / interact with alliance / southern hobby / games-workshop / wizards ordering system
 """
-import pymongo
+import pymongo.errors
 from pymongo import MongoClient
-#
 from pymongo.errors import DuplicateKeyError, PyMongoError
 from pymongo import ASCENDING, DESCENDING
 import os
 from pprint import pprint
-import cPickle
 
 # A problem: data from several sources (with different labels) should affect the same objects.
 # when presented with data to be imported into a given database
@@ -35,9 +33,24 @@ import cPickle
 # 3: Must determine the 'key' values that are unique among imports and that this key-column maps
 #       to equivalent field in destination collection.
 # 4: Ensure that an import has required columns for the planned operation
-# 5:
-
-
+# 5: Test a scheme for self-generated barcodes using product / Alliance code. Print them onto stickers.
+# User Workflow:
+# a) input of all-encompassing data from other sources, ie Alliance, Southern Hobby, GW-TradeRange - no inventory info
+# a1) input the (current) old-POS data as a dictionary indexed on barcodes and Alliance-code
+# b) use physical counts to update / add to main with as much reference to above - establishes counted inventory
+# c) use recent sales to increment / decrement counts OR add the item (with current level) if not already present
+# d) use invoices (saved as CSV) to increment / decrement counts IF rcvd since item was physically counted,
+#       OR add the item with invoiced quant if the item is new... prompt User for barcode
+# e) finally, step through old POS data-lines not yet in inventory IF they indicate a quantity or barcode.
+#       Leave out items with (matching barcode and Alliance-Code) AND no Quantity AND no Desired Quantity
+# f) ps - in old-POS data, check if Alliance-code or Barcode is None - These are likely hand-mis-entered by
+#       idiots and also likely to be duplicate items, perhaps without desired-Quant filled in. A title search
+#       will likely fail unless using approx. matching (FTS? levenshtein?)
+# g) pps - also check for Alliance-codes without any/correct 3-letter manufacturer prefix.
+#       Again, idiots. Check for blank titles too.
+# h) Use old-pos data to fill-in the "desired quant" of every item in main. Export a file to fill in using excel or
+#       just prompt user to fill in each "None" value and perhaps check "zeroes" as well.
+# i)
 actions = {0: "Import new data / inventory (don't write-over old)",
            1: "Import Counted-Inventory info - only apply to current items, no adding sku",
            2: "Check Items Against Inventory, creating two lists, Ins and Outs",
@@ -119,6 +132,7 @@ my pie-in-the-sky plans to automate all the drudge and operate using real data
                }
         return dbd
 
+
 def de_string(i, isint=True):
     """ if getting a string, return pennies on the dollar, or stripped-down string"""
     if isinstance(i, (str, unicode)):
@@ -131,11 +145,12 @@ def de_string(i, isint=True):
             return i.strip()
     return i
 
+
 def explore(done, client):
     """
-Allow exploration of key:value storage in existing mongod instance
-Also selects the database.collection to be used / toyed with.
-"""
+    Allow exploration of key:value storage in existing mongod instance
+    Also selects the database.collection to be used / toyed with.
+    """
     thestuffdb, primarydb = None, None
     usedb_name, collection_name = None, None
     while not done:
@@ -168,9 +183,9 @@ Also selects the database.collection to be used / toyed with.
 
 class CsvMapped(dict):
     """
-Provides persistent pairing of parsed page parts particularly to Mongodb
+Provides persistent pairing of parsed page parts ported particularly to Mongodb
 collection dicts. Mappings can be defined here and also load, if available,
-mappings created earlier during interactive matching process. Goal is
+mappings created earlier during interactive matching. Goal is
 to map a csv-source file to database once & from that time forward, have
 similarly headed documents automatically recognized & imported.
 """
@@ -358,8 +373,8 @@ similarly headed documents automatically recognized & imported.
 
     def parsedata(self, headers, headline, speclist, top_skip=0):
         """
-        the previously read file is a list of lines stored in the instance. The lines
-        are commonly split out by comma or other delimiter, then assigned to dict
+        the previously read file has become a list of lines stored in the instance.
+        The lines are commonly split out by a delimiter, then assigned to dict
         """
         extra_defs = []
         string_ordered = []
@@ -414,19 +429,32 @@ similarly headed documents automatically recognized & imported.
                 line, remover = {}, None
                 for h, cell in zip(string_ordered, lineparts):
                     line[h] = de_string(cell)
-                # extrapolate some things given other things
-                if len(line[u'sku_alliance']) > 4:
-                    line[u'mfr_3letter'] = line[u'sku_alliance'][:3]
-                if 0 < line[u'price_is_NET'] < 100:
-                    line[u'price_we_sell'] = int((line[u'price_we_sell']/float(line[u'price_is_NET']/100.0)) * 100)
-                if (line[u'mfr_3letter'] in self.suppliers) and (line[u'mfr_3letter'] not in line[u'sku_main']):
-                    line[u'sku_main'] = line[u'mfr_3letter'] + " " + line[u'sku_main']
                 # pprint(line)
                 csvdocs.append(line)
 
         print(" {} items are to be gleaned from this '{}' delimited file: {} ".format(numer, self.comma, self.fpath))
         return csvdocs
 
+
+def barcode_lookup(sku, cl, clientdb=u'point_of_sale', bar_col=None, inv_col=None):
+    """
+    look for sku, favor exact match, warn of partial,
+    return related info from 'dictionary' collection for use in main db
+    """
+    client = cl
+    # 'point_of_sale' here refers to the previous Robert Mills created db, used for barcode entry
+    refdb = client[clientdb]
+    # 'dictionary' is just an import of the previous inventory system
+    if not bar_col:
+        bar_col = u'dictionary'
+    # 'products' is physical count & barcode-scan, with sometimes erroneous price & description info
+    if not inv_col:
+        inv_col = u'products'
+    bars = refdb[bar_col]
+    tagged = refdb[inv_col]
+    best =
+    out = db[u'dictionary']
+    return barcode, price, quant
 
 if __name__ == "__main__":
     #dbserverip = '192.168.0.105'
@@ -545,18 +573,21 @@ if __name__ == "__main__":
                         if (len(doc[u'sku_alliance']) > 4) and (len(doc[u'sku_main']) < 4):
                             doc[u'sku_main'] = doc[u'sku_alliance'] or doc[u'sku_alt']
                         # transfer 3-letter manufacturer from alliance
-                        if (len(doc[u'mfr_3letter']) < 3) and (doc[u'sku_alliance'] > 4):
+                        if ((len(doc[u'mfr_3letter']) < 3) and (doc[u'sku_alliance'] > 4) and
+                           (doc[u'mfr_3letter']) in xmarks.suppliers):
                             doc[u'mfr_3letter'] = doc[u'sku_alliance'][:3]
                         # tack on mfr code if it isn't in sku_main
                         if ((len(doc[u'mfr_3letter']) >= 3) and
-                                (doc[u'mfr_3letter'] not in doc[u'sku_main']) and
-                                (doc[u'mfr_3letter']) in xmarks.suppliers):
+                                (doc[u'mfr_3letter'] not in doc[u'sku_main'])):
                             doc[u'sku_main'] = doc[u'mfr_3letter'] + " " + doc[u'sku_main']
                         if doc[u'decrement_quant']:
+                            doc[u'increment_quant'] = doc[u'increment_quant'] or 0
                             doc[u'increment_quant'] -= doc[u'decrement_quant']
                         if doc[u'barcode'] == doc[u'sku_main']:
                             try:
                                 doc[u'barcode'] = barcode_lookup(doc[u'sku_main'])
+                            except Exception as e:
+                                print("{} while looking for 'sku_main' = {}".format(e, doc[u'sku_main']))
                         # see if the item has a pre-existing entry in data
                         in_db = (stuffdb.find_one({u'barcode': doc[u'barcode']}) or
                                   stuffdb.find_one({u'sku_main': doc[u'sku_main']}) or
