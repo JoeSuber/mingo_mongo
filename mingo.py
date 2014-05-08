@@ -436,25 +436,48 @@ similarly headed documents automatically recognized & imported.
         return csvdocs
 
 
-def barcode_lookup(sku, cl, clientdb=u'point_of_sale', bar_col=None, inv_col=None):
+def barcode_via_sku(sku, client=None, clientdb=u'point_of_sale', bar_collection=None, inv_collection=None, DEBUG=True):
     """
-    look for sku, favor exact match, warn of partial,
-    return related info from 'dictionary' collection for use in main db
+    look for 'sku' aka 'product-code' aka 'alliance-code',
+    return related info from 'dictionary' or 'products' collection for use in main db
     """
-    client = cl
+    if not client:
+        cl = MongoClient()
+    else:
+        cl = client
     # 'point_of_sale' here refers to the previous Robert Mills created db, used for barcode entry
-    refdb = client[clientdb]
+    refdb = cl[clientdb]
     # 'dictionary' is just an import of the previous inventory system
-    if not bar_col:
-        bar_col = u'dictionary'
+    if not bar_collection:
+        bar_collection = u'dictionary'
     # 'products' is physical count & barcode-scan, with sometimes erroneous price & description info
-    if not inv_col:
-        inv_col = u'products'
-    bars = refdb[bar_col]
-    tagged = refdb[inv_col]
-    best =
-    out = db[u'dictionary']
-    return barcode, price, quant
+    if not inv_collection:
+        inv_collection = u'products'
+
+    inventory_taker = refdb[inv_collection]
+    taker_columns = [column for column in inventory_taker.viewkeys() if any([(u'bar' in column.lower()),
+                                                                            (u'code' in column.lower()),
+                                                                            (u'sku' in column.lower())])]
+    for ret in [inventory_taker.find_one({label: sku}) for label in taker_columns]:
+        if ret:
+            if DEBUG:
+                print("Found '{}' in 'zapped-in' inventory:".format(sku))
+                pprint(ret)
+            return ret
+
+    bars = refdb[bar_collection]
+    bar_columns = [column for column in bars.viewkeys() if any([(u'bar' in column.lower()),
+                                                                (u'code' in column.lower()),
+                                                                (u'sku' in column.lower())])]
+    for ret in [bars.find_one({label: sku}) for label in bar_columns]:
+        if ret:
+            if DEBUG:
+                print("found '{}' in old POS barcodes:".format(sku))
+                pprint(ret)
+            return ret
+    if DEBUG:
+        print("Couldn't find {} in {} or {}".format(sku, inv_collection, bar_collection))
+    return {}
 
 if __name__ == "__main__":
     #dbserverip = '192.168.0.105'
@@ -567,6 +590,7 @@ if __name__ == "__main__":
                 finished = 0
 
                 for finished, doc in enumerate(csvdocs):
+                    in_db = False
                     # if working on inventory lines to db, do some hacks & hardcoded relations
                     if u'sku_alliance' in doc.keys():
                         # if sku_main is blank, fill it
@@ -583,34 +607,44 @@ if __name__ == "__main__":
                         if doc[u'decrement_quant']:
                             doc[u'increment_quant'] = doc[u'increment_quant'] or 0
                             doc[u'increment_quant'] -= doc[u'decrement_quant']
-                        if doc[u'barcode'] == doc[u'sku_main']:
+                        if (doc[u'barcode'] == doc[u'sku_main']) or \
+                                (not doc[u'barcode'] and any([doc[u'sku_main'], doc[u'sku_alt']])):
                             try:
-                                doc[u'barcode'] = barcode_lookup(doc[u'sku_main'])
+                                looked_up = barcode_via_sku(doc[u'sku_main']) or \
+                                             barcode_via_sku(doc[u'sku_alt'])
+                                for head in looked_up.viewkeys():
+                                    doc[u'barcode'] = looked_up[head] if (u'barcode' in head) else None
+                                    if doc[u'barcode']:
+                                        break
                             except Exception as e:
-                                print("{} while looking for 'sku_main' = {}".format(e, doc[u'sku_main']))
+                                print("{} while looking for barcode via 'sku_main' = {}".format(e, doc[u'sku_main']))
                         # see if the item has a pre-existing entry in data
                         in_db = (stuffdb.find_one({u'barcode': doc[u'barcode']}) or
-                                  stuffdb.find_one({u'sku_main': doc[u'sku_main']}) or
-                                  stuffdb.find_one({u'sku_alt': doc[u'sku_alt']}))
+                                 stuffdb.find_one({u'sku_main': doc[u'sku_main']}) or
+                                 stuffdb.find_one({u'sku_alt': doc[u'sku_alt']}))
 
                         if in_db and doc[u'increment_quant']:
                             doc[u'current_whole_quant'] = in_db[u'current_whole_quant'] + doc[u'increment_quant']
                         elif doc[u'increment_quant'] > 0:
                             doc[u'current_whole_quant'] += doc[u'increment_quant']
+                    else:
+                        print("column header: {}".format(doc.keys()))
+                        print(" of database = {}".format(stuffdb))
+                        print("  is not for inventory import because it has no 'alliance'")
                     if in_db:
                         try:
-                            stuffdb.update({u'barcode': doc[u'barcode'], u'sku_main': doc[u'sku_main']}, doc, upsert=True)
+                            stuffdb.update({u'sku_main': doc[u'sku_main']}, doc, upsert=True)
                         except pymongo.errors.DuplicateKeyError as dup:
                             print('########## {} ####### {}'.format(finished, dup))
                 print("finished = {}".format(finished))
                 # on success, add the input filename to database of imported_fn
-                # save the new map in database because it has succeeded in making a csvdoc
-                importmap.update({u'filepath': xmarks.fn_ctime(fpath)})
-                importmap.update({u'special_commands': importdirections})
-                hdrs.update({u'headline': hdrstring}, )
-                hdrs.update({u'filepath': xmarks.fn_ctime(fpath)}, importmap)
+                new_entry = {u'headline': hdrstring,
+                             u'filepath': xmarks.fn_ctime(fpath),
+                             u'special_commands': importdirections,
+                             u'csv_to_db': importmap}
 
-                hdrs.insert({u'csv_to_db': importmap})
+                # save the new map in database because it has succeeded in making a csvdoc
+                hdrs.update({u'filepath': xmarks.fn_ctime(fpath)}, new_entry, upsert=True, check_keys=True)
                 print("--------- Actions against CSV-import-lines --------------------------")
 
                 # divide items that are in database, items out
