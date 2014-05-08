@@ -273,7 +273,7 @@ similarly headed documents automatically recognized & imported.
         catstart = len(catchoice)
         catchoice.update({len(catchoice): ' - NOT USED - ', len(catchoice)+1: ' - START OVER - '})
         pprint(catchoice)
-        catcutoff = len(catchoice) - catstart
+        catcutoff = len(catchoice) + len(hdrlist) - catstart
         genmap = {}
         total = len(hdrlist)
         for togo, (dbhdrkey, dbhdr) in enumerate(hdrlist.viewitems()):
@@ -577,9 +577,8 @@ if __name__ == "__main__":
                 print("...creating import map ")
                 importmap, importdirections = xmarks.headers_to_mongo(hdrs, hdrstring)
                 if importmap:
-                    print('hdrstring: {}'.format(hdrstring))
+                    print('\n hdrstring: {}'.format(hdrstring))
                     print('importmap ({} items):'.format(len(importmap)))
-                    print('')
                     pprint(importmap)
 
             # using the import-map, dictify data stored in the instance
@@ -633,7 +632,7 @@ if __name__ == "__main__":
                         print("  is not for inventory import because it has no 'alliance'")
                     if in_db:
                         try:
-                            stuffdb.update({u'sku_main': doc[u'sku_main']}, doc, upsert=True)
+                            stuffdb.update({u'sku_main': doc[u'sku_main']}, doc, upsert=True, check_keys=True)
                         except pymongo.errors.DuplicateKeyError as dup:
                             print('########## {} ####### {}'.format(finished, dup))
                 print("finished = {}".format(finished))
