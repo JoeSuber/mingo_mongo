@@ -273,7 +273,7 @@ similarly headed documents automatically recognized & imported.
         catstart = len(catchoice)
         catchoice.update({len(catchoice): ' - NOT USED - ', len(catchoice)+1: ' - START OVER - '})
         pprint(catchoice)
-        catcutoff = len(catchoice) + len(hdrlist) - catstart
+        catcutoff = len(catchoice) - catstart
         genmap = {}
         total = len(hdrlist)
         for togo, (dbhdrkey, dbhdr) in enumerate(hdrlist.viewitems()):
@@ -303,42 +303,14 @@ similarly headed documents automatically recognized & imported.
         # finish out map with optional user-defined uniform default values for blanks in column
         if len(catchoice):
             print(" Press <Enter> for each header if you wish its values to default to 'None'")
-            for leftnum, leftover in catchoice.viewitems():
-                if leftnum < (len(catchoice) - catcutoff):
+            for numer, (leftnum, leftover) in enumerate(catchoice.viewitems()):
+                if numer < (len(catchoice) - (catcutoff + 1)):
                     genmap[leftover] = self.defmark + unicode(raw_input(
                         " ALL '{}' will have a value = : ".format(leftover))).decode()
 
         # gather, attach & record user-commands
-        spec_dd = db[u'commandd']
-        if spec_dd:
-            spec_choice = {num: (choice, description) for num, (choice, description) in enumerate(spec_dd.find())}
-            spec_choice.update({len(spec_choice): (" - DONE -", "quit assigning specials")})
-            num, choice, spec_list = -1000, ("", ""), []
-            while choice[0] is not " - DONE -":
-                num, choice = selections(spec_choice, prompt="Pick special actions from above: ")
-                spec_choice.pop(num)
-                if u'X' in choice[0]:
-                    NEED_DIGITS = True
-                    while NEED_DIGITS:
-                        digits = unicode(raw_input("Input digits: "))
-                        try:
-                            if int(digits) > 0:
-                                NEED_DIGITS = False
-                                choice = choice[0].replace(u'X', "") + digits
-                        except Exception as e:
-                            print(" Whoops... {}".format(e))
-                            print(" Input only positive integers please...")
-                            NEED_DIGITS = True
-                elif u"UNIQUE" in choice[0]:
-                    num, category = selections(hdrlist, "Pick the header under which all values are to be unique: ")
-                    choice = choice[0].split(u'_')[0] + u'_' + category
-                elif u"SPEC" in choice[0]:
-                    mfgrs = {num: mfr for num, mfr in enumerate(db[u'manufacturer'][u'3letter_code'].find())}
-                    num, category = selections(mfgrs, "Which manufacturer code to attach to special: ")
-                    choice = choice[0].split(u'_')[0] + u'_' + category
-                spec_list.append(choice)
-        else:
-            spec_list = []
+
+        spec_list = []
         return genmap, spec_list
 
     def ask_where_join(self, lpl):
@@ -611,6 +583,9 @@ if __name__ == "__main__":
                             try:
                                 looked_up = barcode_via_sku(doc[u'sku_main']) or \
                                              barcode_via_sku(doc[u'sku_alt'])
+                                if looked_up:
+                                    print("looked up!")
+                                    pprint(looked_up)
                                 for head in looked_up.viewkeys():
                                     doc[u'barcode'] = looked_up[head] if (u'barcode' in head) else None
                                     if doc[u'barcode']:
@@ -625,7 +600,7 @@ if __name__ == "__main__":
                         if in_db and doc[u'increment_quant']:
                             doc[u'current_whole_quant'] = in_db[u'current_whole_quant'] + doc[u'increment_quant']
                         elif doc[u'increment_quant'] > 0:
-                            doc[u'current_whole_quant'] += doc[u'increment_quant']
+                            doc[u'current_whole_quant'] = int(doc[u'current_whole_quant'] or 0) + doc[u'increment_quant']
                     else:
                         print("column header: {}".format(doc.keys()))
                         print(" of database = {}".format(stuffdb))
@@ -706,6 +681,10 @@ break
 if not FOUND:
 with open('/home/suber1/Desktop/order.txt', 'ab') as ofob:
 ofob.write("{} - item: {:11} {:7} {} \n".format(ctr, item[u'sku'], item[u'price'], item[u'name']))
+
+u'mfr_3letter'
+
+
 """
 
     #print('Goodbye!')
