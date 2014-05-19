@@ -565,7 +565,7 @@ if __name__ == "__main__":
                     # if working on inventory lines to db, do some hacks & hardcoded relations
                     if u'sku_alliance' in doc.keys():
                         # if sku_main is blank, fill it
-                        if (len(doc[u'sku_alliance']) > 4) and (len(doc[u'sku_main']) < 4):
+                        if (len(unicode(doc[u'sku_alliance'])) > 4) and (len(unicode(doc[u'sku_main'])) < 4):
                             doc[u'sku_main'] = doc[u'sku_alliance'] or doc[u'sku_alt']
                         # transfer 3-letter manufacturer from alliance
                         if ((len(doc[u'mfr_3letter']) < 3) and (doc[u'sku_alliance'] > 4) and
@@ -600,7 +600,7 @@ if __name__ == "__main__":
                         if in_db and doc[u'increment_quant']:
                             doc[u'current_whole_quant'] = in_db[u'current_whole_quant'] + doc[u'increment_quant']
                         elif doc[u'increment_quant'] > 0:
-                            doc[u'current_whole_quant'] = int(doc[u'current_whole_quant'] or 0) + doc[u'increment_quant']
+                            doc[u'current_whole_quant'] = int(doc[u'current_whole_quant'] or 0) + int(doc[u'increment_quant'] or 0)
                     else:
                         print("column header: {}".format(doc.keys()))
                         print(" of database = {}".format(stuffdb))
@@ -621,72 +621,5 @@ if __name__ == "__main__":
                 hdrs.update({u'filepath': xmarks.fn_ctime(fpath)}, new_entry, upsert=True, check_keys=True)
                 print("--------- Actions against CSV-import-lines --------------------------")
 
-                # divide items that are in database, items out
-"""
-# init bulk ops to insert many lines
-bulk = overalldb.initialize_unordered_bulk_op()
-if actiontype == u'New_Data_Bulk_Insert':
-for addline in csvdocs:
-if u'barcode' in importmap:
-bulk.find(addline[u'barcode'])
 
-WORKING = True
-while WORKING:
-try:
-bulk.execute()
-WORKING = False
-except BulkWriteError as bwe:
-WORKING = True
-pprint(bwe.details)
-
-
-
-# record the usage of the csv-file in the database along with action taken
-#importedfn.insert({u'fn': xmarks.fn_ctime(fpath)})
-# assign correct info to correct keys for insertion into current db collection
-#addlist = []
-
-for itemdd in csvdocs:
-csvstuff = {}
-# GWk come from manufacturer's csv-headers, dbv are in mongo database
-for GWk, dbv in xmarks.atlas['GAWmap'].viewitems():
-if GWk in itemdd:
-csvstuff[dbv] = itemdd[GWk]
-addlist.append(csvstuff)
-# also we want the best fit in case some CSVs share column names
-# make report to get what we don't have
-
-# first fix formats and types to conform
-ctr = 0
-for item in addlist:
-FOUND = False
-try:
-item[u'cost'] = int(item[u'cost'].replace('$', "").replace('.', "") or 0)
-item[u'price'] = int(item[u'price'].replace('$', "").replace('.', "") or 0)
-item[u'product_code'] = ('GAW ' + item[u'product_code']).strip()
-#item[u'sku'] = int(item[u'sku'])
-except ValueError as Ve:
-print('*(* VALUE (*(*(*)*) ERRoR *)*)')
-pprint(item)
-pprint(Ve)
-for olditem in stuffdb.find():
-if item[u'sku'] in olditem.viewvalues():
-print('BAR FOUND: {:8} {}'.format(item[u'product_code'], item[u'name']))
-FOUND = True
-break
-elif item[u'product_code'] in olditem.viewvalues():
-print('PCD FOUND: {:8} {}'.format(item[u'product_code'], item[u'name']))
-FOUND = True
-break
-if not FOUND:
-with open('/home/suber1/Desktop/order.txt', 'ab') as ofob:
-ofob.write("{} - item: {:11} {:7} {} \n".format(ctr, item[u'sku'], item[u'price'], item[u'name']))
-
-u'mfr_3letter'
-
-
-"""
-
-    #print('Goodbye!')
-   # exit(0)
 
